@@ -35,3 +35,6 @@ llmagent_web-*.tar
 npm-debug.log
 /assets/node_modules/
 
+# Ignore beam runtime data files
+/data/*.dets
+

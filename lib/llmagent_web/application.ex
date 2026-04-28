@@ -14,12 +14,20 @@ defmodule LlmagentWeb.Application do
       LlmagentWebWeb.Discovery.Events,
       LlmagentWeb.EventBusBridge,
       LlmagentWebWeb.Endpoint
-    ]
+    ] ++ busybody_children()
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: LlmagentWeb.Supervisor]
     Supervisor.start_link(children, opts)
+  end
+
+  defp busybody_children do
+    if Code.ensure_loaded?(Busybody.Client) do
+      [{Busybody.Client, name: "agento", endpoint: LlmagentWebWeb.Endpoint}]
+    else
+      []
+    end
   end
 
   # Tell Phoenix to update the endpoint configuration

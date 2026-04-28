@@ -27,7 +27,7 @@ config :LLMAgent,
   role: System.get_env("LLMAGENT_ROLE", "sysadmin")
 
 config :llmagent_web, LlmagentWebWeb.Endpoint,
-  http: [port: String.to_integer(System.get_env("PORT", "4000"))]
+  http: [port: String.to_integer(System.get_env("PORT", "0"))]
 
 if config_env() == :prod do
   # The secret key base is used to sign/encrypt cookies and other secrets.

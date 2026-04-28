@@ -1,4 +1,5 @@
 defmodule LlmagentWeb.MixProject do
+  @moduledoc false
   use Mix.Project
 
   def project do
@@ -60,8 +61,9 @@ defmodule LlmagentWeb.MixProject do
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
-      {:LLMAgent, path: "../../llmagent"}
+      {:LLMAgent, path: "../../llmagent"},
       # Comn comes transitively through LLMAgent
+      {:busybody, path: "../../busybody", only: :dev}
     ]
   end
 

@@ -1,4 +1,4 @@
-defmodule LlmagentWebWeb.TestLLMClient do
+defmodule AgentoWeb.TestLLMClient do
   @moduledoc """
   Mock LLM client for integration tests.
 

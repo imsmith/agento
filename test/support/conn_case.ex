@@ -1,4 +1,4 @@
-defmodule LlmagentWebWeb.ConnCase do
+defmodule AgentoWeb.ConnCase do
   @moduledoc """
   Test case for tests that require setting up a connection.
 
@@ -10,15 +10,15 @@ defmodule LlmagentWebWeb.ConnCase do
 
   using do
     quote do
-      @endpoint LlmagentWebWeb.Endpoint
+      @endpoint AgentoWeb.Endpoint
 
-      use LlmagentWebWeb, :verified_routes
+      use AgentoWeb, :verified_routes
 
       import Plug.Conn
       import Phoenix.ConnTest
       import Phoenix.LiveViewTest
-      import LlmagentWebWeb.ConnCase
-      import LlmagentWebWeb.IntegrationHelper
+      import AgentoWeb.ConnCase
+      import AgentoWeb.IntegrationHelper
     end
   end
 

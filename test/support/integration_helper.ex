@@ -1,4 +1,4 @@
-defmodule LlmagentWebWeb.IntegrationHelper do
+defmodule AgentoWeb.IntegrationHelper do
   @moduledoc """
   Helpers for integration tests that interact with the live LLMAgent
   supervision tree using `TestLLMClient`.
@@ -8,7 +8,7 @@ defmodule LlmagentWebWeb.IntegrationHelper do
     role: :sysadmin,
     model: "test-model",
     api_host: "http://localhost:11434/v1",
-    llm_client: LlmagentWebWeb.TestLLMClient,
+    llm_client: AgentoWeb.TestLLMClient,
     memory: LLMAgent.Memory.ETS
   ]
 
@@ -69,8 +69,8 @@ defmodule LlmagentWebWeb.IntegrationHelper do
   """
   def subscribe_to_events do
     Phoenix.PubSub.subscribe(
-      LlmagentWeb.PubSub,
-      LlmagentWeb.EventBusBridge.pubsub_topic()
+      Agento.PubSub,
+      Agento.EventBusBridge.pubsub_topic()
     )
   end
 

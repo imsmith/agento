@@ -1,10 +1,10 @@
-defmodule LlmagentWeb.MixProject do
+defmodule Agento.MixProject do
   @moduledoc false
   use Mix.Project
 
   def project do
     [
-      app: :llmagent_web,
+      app: :agento,
       version: "0.1.0",
       elixir: "~> 1.15",
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -21,7 +21,7 @@ defmodule LlmagentWeb.MixProject do
   # Type `mix help compile.app` for more information.
   def application do
     [
-      mod: {LlmagentWeb.Application, []},
+      mod: {Agento.Application, []},
       extra_applications: [:logger, :runtime_tools]
     ]
   end
@@ -77,10 +77,10 @@ defmodule LlmagentWeb.MixProject do
     [
       setup: ["deps.get", "assets.setup", "assets.build"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
-      "assets.build": ["compile", "tailwind llmagent_web", "esbuild llmagent_web"],
+      "assets.build": ["compile", "tailwind agento", "esbuild agento"],
       "assets.deploy": [
-        "tailwind llmagent_web --minify",
-        "esbuild llmagent_web --minify",
+        "tailwind agento --minify",
+        "esbuild agento --minify",
         "phx.digest"
       ],
       precommit: ["compile --warnings-as-errors", "deps.unlock --unused", "format", "test"]

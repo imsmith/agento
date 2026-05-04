@@ -7,24 +7,24 @@
 # General application configuration
 import Config
 
-config :llmagent_web,
+config :agento,
   generators: [timestamp_type: :utc_datetime]
 
 # Configure the endpoint
-config :llmagent_web, LlmagentWebWeb.Endpoint,
+config :agento, AgentoWeb.Endpoint,
   url: [host: "localhost"],
   adapter: Bandit.PhoenixAdapter,
   render_errors: [
-    formats: [html: LlmagentWebWeb.ErrorHTML, json: LlmagentWebWeb.ErrorJSON],
+    formats: [html: AgentoWeb.ErrorHTML, json: AgentoWeb.ErrorJSON],
     layout: false
   ],
-  pubsub_server: LlmagentWeb.PubSub,
+  pubsub_server: Agento.PubSub,
   live_view: [signing_salt: "OP27yCER"]
 
 # Configure esbuild (the version is required)
 config :esbuild,
   version: "0.25.4",
-  llmagent_web: [
+  agento: [
     args:
       ~w(js/app.js --bundle --target=es2022 --outdir=../priv/static/assets/js --external:/fonts/* --external:/images/* --alias:@=.),
     cd: Path.expand("../assets", __DIR__),
@@ -34,7 +34,7 @@ config :esbuild,
 # Configure tailwind (the version is required)
 config :tailwind,
   version: "4.1.12",
-  llmagent_web: [
+  agento: [
     args: ~w(
       --input=assets/css/app.css
       --output=priv/static/assets/css/app.css

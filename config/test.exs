@@ -2,7 +2,7 @@ import Config
 
 # We don't run a server during test. If one is required,
 # you can enable the server option below.
-config :llmagent_web, LlmagentWebWeb.Endpoint,
+config :agento, AgentoWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}, port: 4002],
   secret_key_base: "kJSgFAAkn3aLw4T7YmeaB1mPBobAz53+hSRZnCFkg6nMpZCK6XlqJgpiMwqf/92n",
   server: false
@@ -26,4 +26,4 @@ config :LLMAgent,
   model: "test-model",
   api_host: "http://localhost:11434/v1",
   role: "sysadmin",
-  llm_client: LlmagentWebWeb.TestLLMClient
+  llm_client: AgentoWeb.TestLLMClient

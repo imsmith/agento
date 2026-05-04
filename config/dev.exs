@@ -6,7 +6,7 @@ import Config
 # The watchers configuration can be used to run external
 # watchers to your application. For example, we can use it
 # to bundle .js and .css sources.
-config :llmagent_web, LlmagentWebWeb.Endpoint,
+config :agento, AgentoWeb.Endpoint,
   # Binding to loopback ipv4 address prevents access from other machines.
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
   http: [ip: {0, 0, 0, 0}, port: 0],
@@ -15,8 +15,8 @@ config :llmagent_web, LlmagentWebWeb.Endpoint,
   debug_errors: true,
   secret_key_base: "L+liAfXzvvWOrp0XGrG/NQPk2baw/fKjSZgrcLx5Bob3/RQYxUgzAF0vO36OjQ69",
   watchers: [
-    esbuild: {Esbuild, :install_and_run, [:llmagent_web, ~w(--sourcemap=inline --watch)]},
-    tailwind: {Tailwind, :install_and_run, [:llmagent_web, ~w(--watch)]}
+    esbuild: {Esbuild, :install_and_run, [:agento, ~w(--sourcemap=inline --watch)]},
+    tailwind: {Tailwind, :install_and_run, [:agento, ~w(--watch)]}
   ]
 
 # ## SSL Support
@@ -43,7 +43,7 @@ config :llmagent_web, LlmagentWebWeb.Endpoint,
 # different ports.
 
 # Reload browser tabs when matching files change.
-config :llmagent_web, LlmagentWebWeb.Endpoint,
+config :agento, AgentoWeb.Endpoint,
   live_reload: [
     web_console_logger: true,
     patterns: [
@@ -52,13 +52,13 @@ config :llmagent_web, LlmagentWebWeb.Endpoint,
       # Gettext translations
       ~r"priv/gettext/.*\.po$"E,
       # Router, Controllers, LiveViews and LiveComponents
-      ~r"lib/llmagent_web_web/router\.ex$"E,
-      ~r"lib/llmagent_web_web/(controllers|live|components)/.*\.(ex|heex)$"E
+      ~r"lib/agento_web/router\.ex$"E,
+      ~r"lib/agento_web/(controllers|live|components)/.*\.(ex|heex)$"E
     ]
   ]
 
 # Enable dev routes for dashboard and mailbox
-config :llmagent_web, dev_routes: true
+config :agento, dev_routes: true
 
 # Do not include metadata nor timestamps in development logs
 config :logger, :default_formatter, format: "[$level] $message\n"

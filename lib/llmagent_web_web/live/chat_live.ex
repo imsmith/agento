@@ -201,6 +201,7 @@ defmodule LlmagentWebWeb.ChatLive do
     if socket.assigns.selected_agent do
       agent_name = socket.assigns.selected_agent.name
       LLMAgent.DurableLog.clear(agent_name)
+      LLMAgent.Memory.ETS.delete(agent_name, :history)
 
       {:noreply,
        socket
@@ -574,7 +575,7 @@ defmodule LlmagentWebWeb.ChatLive do
     try do
       LLMAgent.DurableLog.messages_for(agent_name)
     rescue
-      _ -> []
+      ArgumentError -> []
     end
   end
 

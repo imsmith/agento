@@ -1,4 +1,5 @@
 defmodule LlmagentWebWeb.Router do
+  @moduledoc false
   use LlmagentWebWeb, :router
 
   pipeline :browser do
@@ -19,6 +20,9 @@ defmodule LlmagentWebWeb.Router do
 
     # Root redirects to chat
     get "/", PageController, :home
+
+    # R7.3 — download agent history as JSON
+    get "/export/:agent", ExportController, :export
 
     live_session :default, on_mount: {LlmagentWebWeb.Hooks.Observability, :default} do
       live "/chat", ChatLive

@@ -73,7 +73,7 @@ defmodule LlmagentWebWeb.SystemLive do
       try do
         Comn.Repo.Table.ETS.observe(table_name, [])
       rescue
-        _ -> []
+        ArgumentError -> []
       end
 
     {:noreply, assign(socket, selected_table: name, table_entries: entries)}
@@ -99,7 +99,7 @@ defmodule LlmagentWebWeb.SystemLive do
           choices: module.choices()
         }
       rescue
-        _ -> nil
+        ArgumentError -> nil
       end
 
     {:noreply, assign(socket, selected_module: mod_str, module_introspection: introspection)}
@@ -138,19 +138,13 @@ defmodule LlmagentWebWeb.SystemLive do
           last_timestamp: last_ts
         }
       rescue
-        _ -> nil
+        ArgumentError -> nil
       end
 
     {:noreply, assign(socket, durable_selected: agent_str, durable_info: info)}
   rescue
     ArgumentError ->
       {:noreply, put_flash(socket, :error, "Unknown agent")}
-  end
-
-  def handle_event("export_events_json", %{"agent" => _agent_str}, socket) do
-    # Export is handled via a download link generated from the data
-    # For now, we present the data inline
-    {:noreply, socket}
   end
 
   # -- Auto refresh --
@@ -571,6 +565,23 @@ defmodule LlmagentWebWeb.SystemLive do
                   </tr>
                 </tbody>
               </table>
+
+              <div class="mt-3 flex gap-2">
+                <a
+                  href={~p"/export/#{@info.agent}?kind=events"}
+                  class="btn btn-xs btn-primary"
+                  download
+                >
+                  <.icon name="hero-arrow-down-tray-mini" class="size-3" /> Events JSON
+                </a>
+                <a
+                  href={~p"/export/#{@info.agent}?kind=messages"}
+                  class="btn btn-xs btn-primary"
+                  download
+                >
+                  <.icon name="hero-arrow-down-tray-mini" class="size-3" /> Messages JSON
+                </a>
+              </div>
             </div>
           </div>
         <% end %>
@@ -601,14 +612,14 @@ defmodule LlmagentWebWeb.SystemLive do
       try do
         Comn.Errors.categories()
       rescue
-        _ -> []
+        ArgumentError -> []
       end
 
     error_events =
       try do
         LLMAgent.EventLog.for_type(:error)
       rescue
-        _ -> []
+        ArgumentError -> []
       end
 
     assign(socket, error_categories: categories, error_events: error_events)
@@ -639,7 +650,7 @@ defmodule LlmagentWebWeb.SystemLive do
         []
       end
     rescue
-      _ -> []
+      ArgumentError -> []
     end
   end
 
@@ -682,7 +693,7 @@ defmodule LlmagentWebWeb.SystemLive do
           end
         end)
       rescue
-        _ -> []
+        ArgumentError -> []
       end
 
     %{
@@ -701,7 +712,7 @@ defmodule LlmagentWebWeb.SystemLive do
       _ -> fallback
     end
   rescue
-    _ -> fallback
+    ArgumentError -> fallback
   end
 
   defp registered_name(_, fallback), do: fallback
@@ -720,7 +731,7 @@ defmodule LlmagentWebWeb.SystemLive do
         }
       end)
     rescue
-      _ -> []
+      ArgumentError -> []
     end
   end
 
@@ -732,7 +743,7 @@ defmodule LlmagentWebWeb.SystemLive do
       _ -> 0
     end
   rescue
-    _ -> 0
+    ArgumentError -> 0
   end
 
   defp process_mq(_), do: 0
@@ -746,7 +757,7 @@ defmodule LlmagentWebWeb.SystemLive do
         try do
           :ets.info(table, :name)
         rescue
-          _ -> nil
+          ArgumentError -> nil
         end
 
       name && to_string(name) |> String.starts_with?("llmagent_mem_")
@@ -777,7 +788,7 @@ defmodule LlmagentWebWeb.SystemLive do
               nil
           end
         rescue
-          _ -> nil
+          ArgumentError -> nil
         end
 
       %{agent_name: agent.name, context: context}
@@ -790,7 +801,7 @@ defmodule LlmagentWebWeb.SystemLive do
     try do
       Comn.Errors.categorize(reason)
     rescue
-      _ -> :unknown
+      ArgumentError -> :unknown
     end
   end
 
@@ -811,7 +822,7 @@ defmodule LlmagentWebWeb.SystemLive do
         }
       end
     rescue
-      _ -> nil
+      ArgumentError -> nil
     end
   end
 

@@ -38,3 +38,6 @@ npm-debug.log
 # Ignore beam runtime data files
 /data/*.dets
 
+# ElixirLS workspace cache
+/.elixir_ls/
+

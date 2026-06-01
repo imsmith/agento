@@ -481,13 +481,14 @@ defmodule AgentoWeb.ChatLive do
         class="input input-bordered input-sm w-full"
         required
       />
-      <input
-        type="text"
+      <select
         name="role"
-        value={@form.role}
-        placeholder="Role (e.g. sysadmin)"
-        class="input input-bordered input-sm w-full"
-      />
+        class="select select-bordered select-sm w-full"
+      >
+        <option :for={role <- available_roles()} value={role} selected={role == @form.role}>
+          {role}
+        </option>
+      </select>
       <input
         type="text"
         name="model"
@@ -599,5 +600,13 @@ defmodule AgentoWeb.ChatLive do
       model: "llama3.2",
       api_host: "http://localhost:11434/v1"
     }
+  end
+
+  defp available_roles do
+    if function_exported?(LLMAgent.RolePrompt, :roles, 0) do
+      LLMAgent.RolePrompt.roles() |> Enum.map(&to_string/1)
+    else
+      ["default", "sysadmin"]
+    end
   end
 end

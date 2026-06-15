@@ -24,7 +24,7 @@ end
 config :LLMAgent,
   model: System.get_env("LLMAGENT_MODEL", "llama3.2"),
   api_host: System.get_env("LLMAGENT_API_HOST", "http://localhost:11434/v1"),
-  role: System.get_env("LLMAGENT_ROLE", "sysadmin")
+  role: System.get_env("LLMAGENT_ROLE", "default")
 
 config :agento, AgentoWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "0"))]

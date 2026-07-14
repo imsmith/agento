@@ -25,7 +25,8 @@ MCP / A2A / arbitrary APIs). This document specs only the slice below.
 
 - Self-describing API: OpenAPI 3.x served at `GET /specification` and `OPTIONS /`.
 - `GET /agents` — catalog of instantiable agent types.
-- `GET /tools` — list of available tools.
+- `GET /toolbox` — list of available tools (named `/toolbox`, not `/tools`, to
+  avoid colliding with the existing Tools Inspector LiveView at `/tools`).
 - `GET /harness` — provision an isolated, multi-tenant session.
 - `PUT /harness/:session-id` — interact: send context since the last fold,
   stream result frames back as the agent produces them.
@@ -122,10 +123,11 @@ and their declared capabilities).
 }
 ```
 
-### `GET /tools`
+### `GET /toolbox`
 
 List of available tools (from `LLMAgent.Tools.all/0` via
-`AgentoWeb.Discovery.Tools`).
+`AgentoWeb.Discovery.Tools`). Named `/toolbox` to avoid colliding with the
+existing Tools Inspector LiveView mounted at `/tools`.
 
 ```json
 {

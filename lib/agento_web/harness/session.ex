@@ -50,6 +50,58 @@ defmodule AgentoWeb.Harness.Session do
     end
   end
 
+  @spec fold_token(non_neg_integer()) :: String.t()
+  def fold_token(n), do: "fold_#{n}"
+
+  @spec parse_fold(String.t()) :: {:ok, non_neg_integer()} | :error
+  def parse_fold("fold_" <> n) do
+    case Integer.parse(n) do
+      {i, ""} when i >= 0 -> {:ok, i}
+      _ -> :error
+    end
+  end
+
+  def parse_fold(_), do: :error
+
+  @spec context_hash(list()) :: String.t()
+  def context_hash(context) do
+    :crypto.hash(:sha256, :erlang.term_to_binary(context)) |> Base.url_encode64(padding: false)
+  end
+
+  @spec reconcile(String.t(), String.t(), list()) ::
+          {:process, String.t()} | {:replay, [map()]} | {:diverged, String.t()} | {:error, :not_found}
+  def reconcile(session_id, fold_str, context) do
+    with {:ok, fold} <- parse_fold(fold_str),
+         {:ok, current} <- Registry.current_fold(session_id) do
+      hash = context_hash(context)
+
+      cond do
+        fold == current ->
+          {:process, last_user_content(context)}
+
+        match?({:ok, _}, Registry.replay(session_id, fold, hash)) ->
+          {:ok, frames} = Registry.replay(session_id, fold, hash)
+          {:replay, frames}
+
+        true ->
+          {:diverged, fold_token(current)}
+      end
+    else
+      :error -> {:diverged, "fold_0"}
+      {:error, :not_found} -> {:error, :not_found}
+    end
+  end
+
+  defp last_user_content(context) do
+    context
+    |> Enum.reverse()
+    |> Enum.find(&(&1["role"] == "user"))
+    |> case do
+      %{"content" => c} -> c
+      _ -> ""
+    end
+  end
+
   defp to_role(nil), do: :default
   defp to_role(id), do: String.to_existing_atom(id)
 

@@ -13,6 +13,7 @@ defmodule Agento.Application do
       {Phoenix.PubSub, name: Agento.PubSub},
       AgentoWeb.Discovery.Events,
       Agento.EventBusBridge,
+      AgentoWeb.Harness.Registry,
       AgentoWeb.Endpoint
     ] ++ busybody_children()
 

@@ -2,6 +2,11 @@ defmodule AgentoWeb.ChatLive do
   @moduledoc """
   Chat interface LiveView -- agent list sidebar + chat panel.
   Implements R1 (Agent Chat) and R2 (Agent Management).
+
+  Prompts are routed to the selected agent at its global registration
+  (`{:global, name}`). The new-agent form's endpoint dropdown subscribes to
+  `AgentoWeb.Discovery.Endpoints` and refreshes live as LAN llama servers are
+  discovered or expire.
   """
   use AgentoWeb, :live_view
 

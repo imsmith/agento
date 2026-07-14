@@ -7,8 +7,16 @@ defmodule AgentoWeb.Discovery.Endpoints do
   those ads from `LLMAgent.Tools.Discovery` and projects each into a flat
   option map the new-agent dialog can render and submit.
 
-  Provides a stable interface for LiveViews to query available endpoints
-  without coupling directly to LLMAgent's ad internals.
+  `list/0` returns the current endpoints; `subscribe/1` registers the caller
+  for change notifications so a LiveView dropdown can stay live as servers
+  come and go, rather than snapshotting once at mount.
+
+  Projection also normalizes each `api_host` into a dialable URL: bare IPv6
+  literals are bracketed, and unroutable IPv6 link-local (`fe80::/10`)
+  addresses are dropped.
+
+  Provides a stable interface for LiveViews to query and watch available
+  endpoints without coupling directly to LLMAgent's ad internals.
   """
 
   @coordinate "compute.llm.chat"

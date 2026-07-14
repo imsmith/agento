@@ -1,9 +1,10 @@
 defmodule Agento do
   @moduledoc """
-  Agento keeps the contexts that define your domain
-  and business logic.
+  Agento is a Phoenix LiveView web UI over LLMAgent.
 
-  Contexts are also responsible for managing your data, regardless
-  if it comes from the database, an external API or others.
+  It holds no domain logic of its own. The application-level plumbing
+  (`Agento.EventBusBridge`) bridges LLMAgent's EventBus onto `Phoenix.PubSub`;
+  the UI-facing boundary modules live under `AgentoWeb.Discovery.*` and project
+  LLMAgent's public API into shapes the LiveViews can render.
   """
 end

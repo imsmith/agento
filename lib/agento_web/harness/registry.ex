@@ -80,8 +80,11 @@ defmodule AgentoWeb.Harness.Registry do
 
   def handle_call({:commit, id, fold, hash, frames}, _from, state) do
     with_session(state, id, fn s ->
-      next = fold + 1
-      s = %{s | fold: next, turns: Map.put(s.turns, {fold, hash}, frames)}
+      # Advance from the session's actual current fold, not the caller-supplied
+      # one, so a stale/racing caller cannot move the fold backward.
+      _ = fold
+      next = s.fold + 1
+      s = %{s | fold: next, turns: Map.put(s.turns, {s.fold, hash}, frames)}
       {s, {:ok, next}}
     end)
   end

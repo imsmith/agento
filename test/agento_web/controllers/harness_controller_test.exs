@@ -30,4 +30,45 @@ defmodule AgentoWeb.HarnessControllerTest do
       assert Enum.all?(body["tools"], &(is_binary(&1["name"]) and is_binary(&1["module"])))
     end
   end
+
+  describe "GET /harness" do
+    test "provisions a session with a default agent and a fold", %{conn: conn} do
+      body = conn |> get("/harness") |> json_response(201)
+      on_exit_stop_agent(body["session_id"])
+      assert is_binary(body["session_id"])
+      assert body["agent"] == "default"
+      assert body["fold"] == "fold_0"
+      assert is_binary(body["expires_at"])
+    end
+
+    test "negotiates the agent type via the Accept header", %{conn: conn} do
+      body =
+        conn
+        |> put_req_header("accept", "sysadmin")
+        |> get("/harness")
+        |> json_response(201)
+
+      on_exit_stop_agent(body["session_id"])
+      assert body["agent"] == "sysadmin"
+    end
+  end
+
+  defp on_exit_stop_agent(session_id) do
+    ExUnit.Callbacks.on_exit(fn ->
+      case AgentoWeb.Harness.Registry.lookup(session_id) do
+        {:ok, %{agent: agent}} ->
+          try do
+            LLMAgent.AgentSupervisor.stop_agent(agent)
+          rescue
+            # Agent may already be gone by teardown time; not worth failing the suite over.
+            _e in [RuntimeError, ArgumentError] -> :ok
+          catch
+            _, _ -> :ok
+          end
+
+        _ ->
+          :ok
+      end
+    end)
+  end
 end

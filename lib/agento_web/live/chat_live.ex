@@ -11,8 +11,12 @@ defmodule AgentoWeb.ChatLive do
   use AgentoWeb, :live_view
 
   alias AgentoWeb.Discovery.Agents
+  alias AgentoWeb.Discovery.Behaviours
   alias AgentoWeb.Discovery.Endpoints
   alias Agento.EventBusBridge
+
+  @default_llm_client "LLMAgent.LLMClient.OpenAI"
+  @default_memory "LLMAgent.Memory.ETS"
 
   @impl true
   def mount(_params, _session, socket) do
@@ -133,16 +137,28 @@ defmodule AgentoWeb.ChatLive do
   def handle_event("update_new_agent", params, socket) do
     options = socket.assigns.endpoint_options
     current = socket.assigns.new_agent_form
-    selected = Enum.find(options, &(&1.id == params["endpoint"])) || List.first(options)
+    endpoint_id = Map.get(params, "endpoint", current.endpoint_id)
+
+    # "manual" reveals free-form model/api_host inputs; take those verbatim.
+    # Otherwise the selected endpoint supplies both values.
+    {model, api_host} =
+      if endpoint_id == "manual" do
+        {Map.get(params, "model", current.model), Map.get(params, "api_host", current.api_host)}
+      else
+        selected = Enum.find(options, &(&1.id == endpoint_id)) || List.first(options)
+        {selected.model, selected.api_host}
+      end
 
     form =
       current
       |> Map.merge(%{
         name: Map.get(params, "name", current.name),
         role: Map.get(params, "role", current.role),
-        endpoint_id: selected.id,
-        model: selected.model,
-        api_host: selected.api_host
+        endpoint_id: endpoint_id,
+        model: model,
+        api_host: api_host,
+        llm_client: Map.get(params, "llm_client", current.llm_client),
+        memory: Map.get(params, "memory", current.memory)
       })
 
     {:noreply, assign(socket, new_agent_form: form)}
@@ -156,7 +172,9 @@ defmodule AgentoWeb.ChatLive do
       name: name,
       role: String.to_atom(form.role),
       model: form.model,
-      api_host: form.api_host
+      api_host: form.api_host,
+      llm_client: to_module(form.llm_client),
+      memory: to_module(form.memory)
     ]
 
     case Agents.start(opts) do
@@ -428,7 +446,7 @@ defmodule AgentoWeb.ChatLive do
           @event.data["action"]}
       </div>
       <div class="collapse-content text-xs font-mono">
-        <pre class="whitespace-pre-wrap">{inspect(@event.data, pretty: true)}</pre>
+        <pre class="whitespace-pre-wrap">{inspect(sanitize_event_data(@event.data), pretty: true)}</pre>
       </div>
     </div>
     """
@@ -446,7 +464,7 @@ defmodule AgentoWeb.ChatLive do
         <% end %>
       </div>
       <div class="collapse-content text-xs font-mono">
-        <pre class="whitespace-pre-wrap">{inspect(@event.data, pretty: true)}</pre>
+        <pre class="whitespace-pre-wrap">{inspect(sanitize_event_data(@event.data), pretty: true)}</pre>
       </div>
     </div>
     """
@@ -489,6 +507,14 @@ defmodule AgentoWeb.ChatLive do
           <td>{@agent.api_host}</td>
         </tr>
         <tr>
+          <td class="font-semibold">LLM Client</td>
+          <td>{inspect(@agent.llm_client)}</td>
+        </tr>
+        <tr>
+          <td class="font-semibold">Memory</td>
+          <td>{inspect(@agent.memory)}</td>
+        </tr>
+        <tr>
           <td class="font-semibold">History Length</td>
           <td>{@agent.history_length}</td>
         </tr>
@@ -528,6 +554,38 @@ defmodule AgentoWeb.ChatLive do
           {ep.label}
         </option>
       </select>
+      <%= if @form.endpoint_id == "manual" do %>
+        <input
+          type="text"
+          name="model"
+          value={@form.model}
+          placeholder="Model (e.g. llama3.2)"
+          class="input input-bordered input-sm w-full"
+        />
+        <input
+          type="text"
+          name="api_host"
+          value={@form.api_host}
+          placeholder="API host (e.g. http://localhost:11434/v1)"
+          class="input input-bordered input-sm w-full"
+        />
+      <% end %>
+      <select
+        name="llm_client"
+        class="select select-bordered select-sm w-full"
+      >
+        <option :for={mod <- llm_client_options()} value={mod} selected={mod == @form.llm_client}>
+          {mod}
+        </option>
+      </select>
+      <select
+        name="memory"
+        class="select select-bordered select-sm w-full"
+      >
+        <option :for={mod <- memory_options()} value={mod} selected={mod == @form.memory}>
+          {mod}
+        </option>
+      </select>
       <div class="flex gap-1">
         <button type="submit" class="btn btn-primary btn-sm flex-1">Start</button>
         <button type="button" phx-click="toggle_new_agent_form" class="btn btn-ghost btn-sm">
@@ -563,26 +621,18 @@ defmodule AgentoWeb.ChatLive do
         |> update(:messages, &(&1 ++ [msg]))
         |> assign(thinking: if(is_assistant?, do: false, else: socket.assigns.thinking))
 
-      # tool_dispatch and tool.* events don't carry agent_id in their data,
-      # so we match on thinking state (we're waiting for a response from this agent)
-      "agent.tool_dispatch" ->
-        if socket.assigns.thinking and agent_name != nil do
-          update(socket, :events_inline, &(&1 ++ [{:tool_dispatch, event}]))
-        else
-          socket
-        end
+      # Both agent.tool_dispatch and tool.* carry agent_id, so filter by the
+      # selected agent directly rather than guessing from thinking state.
+      "agent.tool_dispatch" when matches_agent? ->
+        update(socket, :events_inline, &(&1 ++ [{:tool_dispatch, event}]))
 
       "agent.error" when matches_agent? ->
         socket
         |> update(:events_inline, &(&1 ++ [{:error, event}]))
         |> assign(thinking: false)
 
-      "tool." <> _name ->
-        if socket.assigns.thinking and agent_name != nil do
-          update(socket, :events_inline, &(&1 ++ [{:tool_result, event}]))
-        else
-          socket
-        end
+      "tool." <> _name when matches_agent? ->
+        update(socket, :events_inline, &(&1 ++ [{:tool_result, event}]))
 
       "agent.prompt" when matches_agent? ->
         assign(socket, thinking: true)
@@ -630,7 +680,13 @@ defmodule AgentoWeb.ChatLive do
   end
 
   defp endpoint_options do
-    Endpoints.list() ++ [local_fallback()]
+    Endpoints.list() ++ [local_fallback(), manual_option()]
+  end
+
+  # Sentinel option that reveals free-form model/api_host inputs. Kept last so
+  # discovered endpoints (and the local fallback) remain the default selection.
+  defp manual_option do
+    %{id: "manual", api_host: "", model: "", label: "Manual entry"}
   end
 
   # Recompute the dropdown after a discovery change, preserving the user's
@@ -639,14 +695,20 @@ defmodule AgentoWeb.ChatLive do
   defp refresh_endpoint_options(socket) do
     options = endpoint_options()
     form = socket.assigns.new_agent_form
-    selected = Enum.find(options, &(&1.id == form.endpoint_id)) || List.first(options)
 
+    # Manual entry owns its own model/api_host; only re-derive for real endpoints.
     form =
-      Map.merge(form, %{
-        endpoint_id: selected.id,
-        model: selected.model,
-        api_host: selected.api_host
-      })
+      if form.endpoint_id == "manual" do
+        form
+      else
+        selected = Enum.find(options, &(&1.id == form.endpoint_id)) || List.first(options)
+
+        Map.merge(form, %{
+          endpoint_id: selected.id,
+          model: selected.model,
+          api_host: selected.api_host
+        })
+      end
 
     assign(socket, endpoint_options: options, new_agent_form: form)
   end
@@ -659,7 +721,9 @@ defmodule AgentoWeb.ChatLive do
       role: "default",
       endpoint_id: ep.id,
       model: ep.model,
-      api_host: ep.api_host
+      api_host: ep.api_host,
+      llm_client: @default_llm_client,
+      memory: @default_memory
     }
   end
 
@@ -670,4 +734,43 @@ defmodule AgentoWeb.ChatLive do
       ["default", "sysadmin"]
     end
   end
+
+  # Discovered LLM client / memory modules, rendered as their inspected names
+  # (e.g. "LLMAgent.LLMClient.OpenAI"). The default is always present so the
+  # select is never empty before discovery has surfaced anything.
+  defp llm_client_options do
+    Behaviours.llm_clients()
+    |> Enum.map(&inspect/1)
+    |> ensure_default(@default_llm_client)
+  end
+
+  defp memory_options do
+    Behaviours.memory_backends()
+    |> Enum.map(&inspect/1)
+    |> ensure_default(@default_memory)
+  end
+
+  defp ensure_default(mods, default) do
+    if default in mods, do: mods, else: [default | mods]
+  end
+
+  defp to_module(str) when is_binary(str), do: Module.concat([str])
+
+  # Truncate long string values (mirroring LLMAgent's 200-char cap) before we
+  # render event payloads inline in the chat, recursing into nested maps/lists.
+  defp sanitize_event_data(%{__struct__: _} = data), do: data
+
+  defp sanitize_event_data(data) when is_map(data) do
+    Map.new(data, fn {k, v} -> {k, sanitize_value(v)} end)
+  end
+
+  defp sanitize_event_data(data), do: data
+
+  defp sanitize_value(v) when is_binary(v) and byte_size(v) > 200 do
+    String.slice(v, 0, 200) <> "...(truncated)"
+  end
+
+  defp sanitize_value(v) when is_map(v), do: sanitize_event_data(v)
+  defp sanitize_value(v) when is_list(v), do: Enum.map(v, &sanitize_value/1)
+  defp sanitize_value(v), do: v
 end

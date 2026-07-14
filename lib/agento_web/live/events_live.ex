@@ -22,14 +22,19 @@ defmodule AgentoWeb.EventsLive do
         active_nav: :events,
         live_events: [],
         auto_scroll: true,
+        # Rows whose data payload is expanded inline (R3.1)
+        expanded_rows: MapSet.new(),
         # Filters
         filter_topic: "",
         filter_type: "",
         filter_agent_id: "",
+        filter_from: "",
+        filter_to: "",
         # Dropdown options (discovered)
         known_topics: Events.topics(),
         known_types: Events.types(),
-        known_agents: Events.agent_ids(),
+        # Merge topics observed in events with currently-running agents (R3.2)
+        known_agents: merged_agent_ids(),
         # Tab: :live | :durable_log | :event_log
         active_tab: :live,
         # Query results
@@ -78,6 +83,20 @@ defmodule AgentoWeb.EventsLive do
     {:noreply, assign(socket, auto_scroll: !socket.assigns.auto_scroll)}
   end
 
+  def handle_event("toggle_row", %{"index" => index_str}, socket) do
+    index = String.to_integer(index_str)
+    expanded = socket.assigns.expanded_rows
+
+    expanded =
+      if MapSet.member?(expanded, index) do
+        MapSet.delete(expanded, index)
+      else
+        MapSet.put(expanded, index)
+      end
+
+    {:noreply, assign(socket, expanded_rows: expanded)}
+  end
+
   def handle_event("clear_stream", _params, socket) do
     {:noreply, assign(socket, live_events: [])}
   end
@@ -88,12 +107,21 @@ defmodule AgentoWeb.EventsLive do
      assign(socket,
        filter_topic: Map.get(params, "topic", socket.assigns.filter_topic),
        filter_type: Map.get(params, "type", socket.assigns.filter_type),
-       filter_agent_id: Map.get(params, "agent_id", socket.assigns.filter_agent_id)
+       filter_agent_id: Map.get(params, "agent_id", socket.assigns.filter_agent_id),
+       filter_from: Map.get(params, "from", socket.assigns.filter_from),
+       filter_to: Map.get(params, "to", socket.assigns.filter_to)
      )}
   end
 
   def handle_event("clear_filters", _params, socket) do
-    {:noreply, assign(socket, filter_topic: "", filter_type: "", filter_agent_id: "")}
+    {:noreply,
+     assign(socket,
+       filter_topic: "",
+       filter_type: "",
+       filter_agent_id: "",
+       filter_from: "",
+       filter_to: ""
+     )}
   end
 
   # DurableLog query (R3.3)
@@ -120,7 +148,8 @@ defmodule AgentoWeb.EventsLive do
             LLMAgent.DurableLog.events_for(agent_atom)
           end
         rescue
-          _ -> []
+          # No DurableLog for this agent, or a malformed since-timestamp.
+          _e in [ArgumentError, KeyError, MatchError] -> []
         end
       else
         []
@@ -161,7 +190,8 @@ defmodule AgentoWeb.EventsLive do
             []
         end
       rescue
-        _ -> []
+        # EventLog may be absent, or the filter may be an unknown atom/timestamp.
+        _e in [ArgumentError, KeyError, MatchError] -> []
       end
 
     {:noreply, assign(socket, eventlog_results: results)}
@@ -177,6 +207,12 @@ defmodule AgentoWeb.EventsLive do
   def handle_event("show_query_event", %{"index" => index_str}, socket) do
     index = String.to_integer(index_str)
     event = Enum.at(socket.assigns.query_results, index)
+    {:noreply, assign(socket, selected_event: event)}
+  end
+
+  def handle_event("show_eventlog_event", %{"index" => index_str}, socket) do
+    index = String.to_integer(index_str)
+    event = Enum.at(socket.assigns.eventlog_results, index)
     {:noreply, assign(socket, selected_event: event)}
   end
 
@@ -221,12 +257,22 @@ defmodule AgentoWeb.EventsLive do
               <% :live -> %>
                 <.live_stream_panel
                   events={
-                    filtered_events(@live_events, @filter_topic, @filter_type, @filter_agent_id)
+                    filtered_events(
+                      @live_events,
+                      @filter_topic,
+                      @filter_type,
+                      @filter_agent_id,
+                      @filter_from,
+                      @filter_to
+                    )
                   }
                   auto_scroll={@auto_scroll}
+                  expanded_rows={@expanded_rows}
                   filter_topic={@filter_topic}
                   filter_type={@filter_type}
                   filter_agent_id={@filter_agent_id}
+                  filter_from={@filter_from}
+                  filter_to={@filter_to}
                   known_topics={@known_topics}
                   known_types={@known_types}
                   known_agents={@known_agents}
@@ -300,6 +346,24 @@ defmodule AgentoWeb.EventsLive do
               <% end %>
             </select>
           </div>
+          <div>
+            <label class="label text-xs">From</label>
+            <input
+              type="datetime-local"
+              name="from"
+              value={@filter_from}
+              class="input input-bordered input-sm"
+            />
+          </div>
+          <div>
+            <label class="label text-xs">To</label>
+            <input
+              type="datetime-local"
+              name="to"
+              value={@filter_to}
+              class="input input-bordered input-sm"
+            />
+          </div>
           <button type="button" phx-click="clear_filters" class="btn btn-ghost btn-sm">
             Clear
           </button>
@@ -321,7 +385,12 @@ defmodule AgentoWeb.EventsLive do
       </div>
 
       <%!-- Event list --%>
-      <div class="flex-1 overflow-y-auto" id="event-stream">
+      <div
+        class="flex-1 overflow-y-auto"
+        id="event-stream"
+        phx-hook="AutoScroll"
+        data-auto-scroll={to_string(@auto_scroll)}
+      >
         <%= if @events == [] do %>
           <p class="p-4 text-sm text-base-content/50">No events yet. Waiting for activity...</p>
         <% else %>
@@ -332,20 +401,66 @@ defmodule AgentoWeb.EventsLive do
                 <th>Topic</th>
                 <th>Type</th>
                 <th>Source</th>
-                <th class="w-12"></th>
+                <th class="w-8"></th>
+                <th class="w-8"></th>
               </tr>
             </thead>
             <tbody>
               <%= for {{topic, event}, idx} <- Enum.with_index(@events) do %>
-                <tr class="hover cursor-pointer" phx-click="show_event" phx-value-index={idx}>
-                  <td class="font-mono text-xs">{Map.get(event, :timestamp, "")}</td>
-                  <td class="text-xs">{topic}</td>
+                <tr class="hover">
+                  <td
+                    class="font-mono text-xs cursor-pointer"
+                    phx-click="show_event"
+                    phx-value-index={idx}
+                  >
+                    {Map.get(event, :timestamp, "")}
+                  </td>
+                  <td
+                    class="text-xs cursor-pointer"
+                    phx-click="show_event"
+                    phx-value-index={idx}
+                  >
+                    {topic}
+                  </td>
                   <td class="text-xs">{Map.get(event, :type, "")}</td>
                   <td class="text-xs truncate max-w-32">{Map.get(event, :source, "")}</td>
                   <td>
-                    <.icon name="hero-chevron-right-mini" class="size-3" />
+                    <button
+                      type="button"
+                      phx-click="toggle_row"
+                      phx-value-index={idx}
+                      class="btn btn-ghost btn-xs"
+                      title="Expand payload"
+                    >
+                      <.icon
+                        name={
+                          if MapSet.member?(@expanded_rows, idx),
+                            do: "hero-chevron-down-mini",
+                            else: "hero-chevron-right-mini"
+                        }
+                        class="size-3"
+                      />
+                    </button>
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      phx-click="show_event"
+                      phx-value-index={idx}
+                      class="btn btn-ghost btn-xs"
+                      title="Open detail"
+                    >
+                      <.icon name="hero-arrow-top-right-on-square-mini" class="size-3" />
+                    </button>
                   </td>
                 </tr>
+                <%= if MapSet.member?(@expanded_rows, idx) do %>
+                  <tr class="bg-base-200">
+                    <td colspan="6" class="p-0">
+                      <pre class="text-xs font-mono bg-base-300 p-3 m-2 rounded whitespace-pre-wrap overflow-x-auto">{inspect(Map.get(event, :data, %{}), pretty: true)}</pre>
+                    </td>
+                  </tr>
+                <% end %>
               <% end %>
             </tbody>
           </table>
@@ -482,8 +597,8 @@ defmodule AgentoWeb.EventsLive do
               </tr>
             </thead>
             <tbody>
-              <%= for event <- @results do %>
-                <tr class="hover">
+              <%= for {event, idx} <- Enum.with_index(@results) do %>
+                <tr class="hover cursor-pointer" phx-click="show_eventlog_event" phx-value-index={idx}>
                   <td class="font-mono text-xs">{Map.get(event, :timestamp, "")}</td>
                   <td class="text-xs">{Map.get(event, :topic, "")}</td>
                   <td class="text-xs">{Map.get(event, :type, "")}</td>
@@ -527,11 +642,13 @@ defmodule AgentoWeb.EventsLive do
 
   # -- Helpers --
 
-  defp filtered_events(events, topic, type, agent_id) do
+  defp filtered_events(events, topic, type, agent_id, from, to) do
     events
     |> maybe_filter_topic(topic)
     |> maybe_filter_type(type)
     |> maybe_filter_agent(agent_id)
+    |> maybe_filter_from(from)
+    |> maybe_filter_to(to)
   end
 
   defp maybe_filter_topic(events, ""), do: events
@@ -561,6 +678,78 @@ defmodule AgentoWeb.EventsLive do
       aid = data[:agent_id] || data["agent_id"]
       to_string(aid) == agent_id
     end)
+  end
+
+  # Time-range filtering (R3.2). Boundaries come from datetime-local inputs
+  # (naive, no zone); event timestamps are ISO-8601. Compare on naive datetimes.
+  defp maybe_filter_from(events, ""), do: events
+
+  defp maybe_filter_from(events, from) do
+    case parse_boundary(from) do
+      nil -> events
+      boundary -> Enum.filter(events, &event_at_or_after?(&1, boundary))
+    end
+  end
+
+  defp maybe_filter_to(events, ""), do: events
+
+  defp maybe_filter_to(events, to) do
+    case parse_boundary(to) do
+      nil -> events
+      boundary -> Enum.filter(events, &event_at_or_before?(&1, boundary))
+    end
+  end
+
+  defp event_at_or_after?({_t, event}, boundary) do
+    case event_naive(event) do
+      nil -> false
+      naive -> NaiveDateTime.compare(naive, boundary) != :lt
+    end
+  end
+
+  defp event_at_or_before?({_t, event}, boundary) do
+    case event_naive(event) do
+      nil -> false
+      naive -> NaiveDateTime.compare(naive, boundary) != :gt
+    end
+  end
+
+  defp event_naive(event) do
+    case Map.get(event, :timestamp) do
+      ts when is_binary(ts) ->
+        case DateTime.from_iso8601(ts) do
+          {:ok, dt, _} -> DateTime.to_naive(dt)
+          _ -> nil
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  # datetime-local yields "YYYY-MM-DDTHH:MM"; NaiveDateTime wants seconds.
+  defp parse_boundary(value) do
+    normalized =
+      case String.split(value, ":") do
+        [_h, _m] -> value <> ":00"
+        _ -> value
+      end
+
+    case NaiveDateTime.from_iso8601(normalized) do
+      {:ok, naive} -> naive
+      _ -> nil
+    end
+  end
+
+  # Merge agent IDs seen in events with currently-running agents (R3.2).
+  defp merged_agent_ids do
+    running =
+      AgentoWeb.Discovery.Agents.list()
+      |> Enum.map(& &1.name)
+
+    (Events.agent_ids() ++ running)
+    |> Enum.uniq()
+    |> Enum.sort_by(&to_string/1)
   end
 
   defp update_known_filters(socket, topic, event) do

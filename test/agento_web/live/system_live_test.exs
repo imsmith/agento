@@ -105,7 +105,68 @@ defmodule AgentoWeb.SystemLiveTest do
     end
   end
 
+  describe "Supervision Tree agent labels (R4.3)" do
+    test "agent children are labeled by state name, not \"undefined\"", %{conn: conn} do
+      {:ok, _pid} = start_test_agent(:tree_label_agent)
+      Process.sleep(100)
+
+      {:ok, view, _html} = live(conn, "/system")
+      view |> element("button[phx-click=refresh]") |> render_click()
+
+      html = render(view)
+      # The DynamicSupervisor child has no registered name; its label must be
+      # recovered from :sys.get_state(pid).name rather than shown as "undefined".
+      assert html =~ "tree_label_agent"
+    end
+  end
+
+  describe "Error Catalog grouping (R5.3)" do
+    test "error events are grouped into per-category containers", %{conn: conn} do
+      LLMAgent.Events.emit(:error, "agent.error", %{
+        reason: "connection refused",
+        source: "sys_r53_net"
+      })
+
+      LLMAgent.Events.emit(:error, "agent.error", %{
+        reason: "invalid input format",
+        source: "sys_r53_val"
+      })
+
+      Process.sleep(50)
+
+      {:ok, view, _html} = live(conn, "/system")
+      view |> element("[phx-click=set_tab][phx-value-tab=errors]") |> render_click()
+
+      html = render(view)
+      # Grouped rendering emits one container per category, keyed by category atom.
+      assert html =~ ~s(data-category="network")
+      assert html =~ ~s(data-category="validation")
+      assert html =~ "connection refused"
+      assert html =~ "invalid input format"
+    end
+  end
+
   describe "DurableLog Inspector (R7)" do
+    test "lists agents from history even after they stop (R7.2)", %{conn: conn} do
+      {:ok, _pid} = start_test_agent(:durable_history_agent)
+      Process.sleep(100)
+
+      send_prompt(:durable_history_agent, "record something durable")
+      Process.sleep(500)
+
+      # Stop the agent so it is no longer a running agent.
+      LLMAgent.AgentSupervisor.stop_agent(:durable_history_agent)
+      Process.sleep(100)
+
+      {:ok, view, _html} = live(conn, "/system")
+      view |> element("[phx-click=set_tab][phx-value-tab=durable_log]") |> render_click()
+      view |> element("button[phx-click=refresh]") |> render_click()
+
+      html = render(view)
+      # The stopped agent must still be selectable, derived from the DETS log.
+      assert html =~ "durable_history_agent"
+    end
+
     test "DurableLog tab shows status and agents", %{conn: conn} do
       {:ok, _pid} = start_test_agent(:durable_test_status)
       Process.sleep(100)

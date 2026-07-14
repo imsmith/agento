@@ -25,11 +25,29 @@ import {LiveSocket} from "phoenix_live_view"
 import {hooks as colocatedHooks} from "phoenix-colocated/agento"
 import topbar from "../vendor/topbar"
 
+// AutoScroll: keep a live-updating container pinned to the bottom.
+// The Event Explorer stream sets data-auto-scroll="true|false" on the
+// container so the server-side toggle controls whether we follow new events.
+const Hooks = {}
+Hooks.AutoScroll = {
+  scrollToBottom() {
+    if (this.el.dataset.autoScroll === "true") {
+      this.el.scrollTop = this.el.scrollHeight
+    }
+  },
+  mounted() {
+    this.scrollToBottom()
+  },
+  updated() {
+    this.scrollToBottom()
+  },
+}
+
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks},
+  hooks: {...colocatedHooks, ...Hooks},
 })
 
 // Show progress bar on live navigation and form submits

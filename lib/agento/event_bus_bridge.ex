@@ -47,13 +47,26 @@ defmodule Agento.EventBusBridge do
   @spec pubsub() :: atom()
   def pubsub, do: @pubsub
 
+  @doc """
+  Discovers the full set of topics the bridge should be subscribed to.
+
+  Combines the static seed list (bootstrap only) with topics observed at
+  runtime: registered tool topics, distinct topics in `LLMAgent.EventLog`,
+  and topics tracked by `AgentoWeb.Discovery.Events`. This lets a brand-new
+  `agent.*`/`web.*`/`tool.*` topic that actually occurs get picked up on the
+  next poll without any code change.
+  """
+  @spec discover_topics() :: [String.t()]
+  def discover_topics do
+    (@known_topics ++ discover_tool_topics() ++ discover_log_topics() ++ discover_tracked_topics())
+    |> Enum.uniq()
+  end
+
   # -- GenServer callbacks --
 
   @impl true
   def init(_opts) do
-    subscribed = subscribe_to_topics(@known_topics, MapSet.new())
-    tool_topics = discover_tool_topics()
-    subscribed = subscribe_to_topics(tool_topics, subscribed)
+    subscribed = subscribe_to_topics(discover_topics(), MapSet.new())
 
     schedule_tool_poll()
 
@@ -67,8 +80,7 @@ defmodule Agento.EventBusBridge do
   end
 
   def handle_info(:poll_tools, state) do
-    tool_topics = discover_tool_topics()
-    new_subscribed = subscribe_to_topics(tool_topics, state.subscribed_topics)
+    new_subscribed = subscribe_to_topics(discover_topics(), state.subscribed_topics)
     schedule_tool_poll()
     {:noreply, %{state | subscribed_topics: new_subscribed}}
   end
@@ -98,12 +110,27 @@ defmodule Agento.EventBusBridge do
   end
 
   defp discover_tool_topics do
-    try do
-      LLMAgent.Tools.all()
-      |> Enum.map(fn {name, _module} -> "tool.#{name}" end)
-    rescue
-      _ -> []
-    end
+    LLMAgent.Tools.all()
+    |> Enum.map(fn {name, _module} -> "tool.#{name}" end)
+  rescue
+    # Tools registry may be absent or its API may drift before the tree is up.
+    _e in [UndefinedFunctionError, ArgumentError, FunctionClauseError] -> []
+  end
+
+  defp discover_log_topics do
+    LLMAgent.EventLog.all()
+    |> Enum.map(& &1.topic)
+    |> Enum.reject(&is_nil/1)
+  rescue
+    # EventLog Agent may not be started yet, or entries may lack a topic field.
+    _e in [UndefinedFunctionError, ArgumentError, KeyError] -> []
+  end
+
+  defp discover_tracked_topics do
+    AgentoWeb.Discovery.Events.topics()
+  rescue
+    # Discovery.Events Agent may not be running in every runtime context.
+    _e in [UndefinedFunctionError, ArgumentError] -> []
   end
 
   defp schedule_tool_poll do

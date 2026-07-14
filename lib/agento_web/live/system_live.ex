@@ -418,22 +418,30 @@ defmodule AgentoWeb.SystemLive do
       </div>
 
       <div>
-        <h4 class="text-sm font-semibold mb-1">Recent Error Events</h4>
+        <h4 class="text-sm font-semibold mb-1">Error Events by Category</h4>
         <%= if @events == [] do %>
           <p class="text-sm text-base-content/50">No error events recorded.</p>
         <% else %>
-          <div class="space-y-2">
-            <%= for evt <- @events do %>
-              <div class="alert alert-error text-sm">
-                <div>
-                  <div class="font-medium">
-                    {evt.data[:reason] || evt.data["reason"] || "unknown"}
-                  </div>
-                  <div class="text-xs">
-                    Source: {evt.data[:source] || evt.data["source"] || "unknown"} | Category: {categorize_reason(
-                      evt.data[:reason] || evt.data["reason"]
-                    )}
-                  </div>
+          <div class="space-y-4">
+            <%= for {category, evts} <- group_errors_by_category(@events) do %>
+              <div data-category={category}>
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="badge badge-neutral">{category}</span>
+                  <span class="text-xs text-base-content/60">{length(evts)}</span>
+                </div>
+                <div class="space-y-2">
+                  <%= for evt <- evts do %>
+                    <div class="alert alert-error text-sm">
+                      <div>
+                        <div class="font-medium">
+                          {evt.data[:reason] || evt.data["reason"] || "unknown"}
+                        </div>
+                        <div class="text-xs">
+                          Source: {evt.data[:source] || evt.data["source"] || "unknown"}
+                        </div>
+                      </div>
+                    </div>
+                  <% end %>
                 </div>
               </div>
             <% end %>
@@ -683,7 +691,7 @@ defmodule AgentoWeb.SystemLive do
             child_mq = if child_info, do: Keyword.get(child_info, :message_queue_len, 0), else: 0
 
             %{
-              name: registered_name(child_pid, child_label),
+              name: node_label(child_pid, child_label),
               module: modules |> List.wrap() |> Enum.join(", "),
               pid: child_pid,
               alive: is_pid(child_pid) and Process.alive?(child_pid),
@@ -706,23 +714,47 @@ defmodule AgentoWeb.SystemLive do
     }
   end
 
-  defp registered_name(pid, fallback) when is_pid(pid) do
+  # Best-effort label for a supervision-tree node. Prefer the local registered
+  # name; agents run unregistered under the DynamicSupervisor (R4.3), so fall
+  # back to the `.name` field in the process's GenServer state before the
+  # supervisor child id.
+  defp node_label(pid, fallback) when is_pid(pid) do
     case Process.info(pid, :registered_name) do
-      {:registered_name, name} when is_atom(name) -> to_string(name)
-      _ -> fallback
+      {:registered_name, name} when is_atom(name) and not is_nil(name) ->
+        to_string(name)
+
+      _ ->
+        state_name(pid) || fallback
     end
   rescue
     ArgumentError -> fallback
   end
 
-  defp registered_name(_, fallback), do: fallback
+  defp node_label(_, fallback), do: fallback
+
+  # Extract `.name` from a process's GenServer state via :sys.get_state. Guards
+  # against non-agent processes (state may not be a map or may lack :name) and
+  # against :sys.get_state failing, timing out, or exiting.
+  defp state_name(pid) when is_pid(pid) do
+    case :sys.get_state(pid, 100) do
+      %{name: name} when not is_nil(name) -> to_string(name)
+      _ -> nil
+    end
+  rescue
+    # Non-OTP or non-map state; nothing to extract.
+    _e in [ArgumentError, RuntimeError] -> nil
+  catch
+    :exit, _ -> nil
+  end
+
+  defp state_name(_), do: nil
 
   defp maybe_children(pid, :supervisor) when is_pid(pid) do
     try do
       Supervisor.which_children(pid)
       |> Enum.map(fn {id, child_pid, type, modules} ->
         %{
-          name: registered_name(child_pid, to_string(id)),
+          name: node_label(child_pid, to_string(id)),
           module: modules |> List.wrap() |> Enum.join(", "),
           pid: child_pid,
           alive: is_pid(child_pid) and Process.alive?(child_pid),
@@ -805,6 +837,23 @@ defmodule AgentoWeb.SystemLive do
     end
   end
 
+  # Group error events by their Comn.Errors category, returning
+  # `[{category, events}]` in the canonical category order (Comn.Errors.categories/0),
+  # with any unexpected categories appended and empty categories dropped.
+  defp group_errors_by_category(events) do
+    by_cat =
+      Enum.group_by(events, fn evt ->
+        categorize_reason(evt.data[:reason] || evt.data["reason"])
+      end)
+
+    ordered = Comn.Errors.categories()
+    extra = Map.keys(by_cat) -- ordered
+
+    (ordered ++ extra)
+    |> Enum.map(fn category -> {category, Map.get(by_cat, category, [])} end)
+    |> Enum.reject(fn {_category, evts} -> evts == [] end)
+  end
+
   # -- DurableLog helpers (R7) --
 
   defp get_durable_log_status do
@@ -827,9 +876,29 @@ defmodule AgentoWeb.SystemLive do
   end
 
   defp get_durable_agents do
-    # Derive agent list from running agents + any we can discover from DurableLog
-    Agents.list()
-    |> Enum.map(& &1.name)
+    # Merge currently-running agents with any agent_ids that only exist in the
+    # DurableLog DETS table (agents that ran and stopped). Dedup and sort.
+    running = Agents.list() |> Enum.map(& &1.name)
+    historical = durable_log_agent_ids()
+
+    (running ++ historical)
+    |> Enum.uniq()
     |> Enum.sort()
+  end
+
+  # Enumerate the distinct agent_ids stored in the DurableLog DETS table.
+  # The table is keyed by agent_id ({agent_id, event}); a read-only fold
+  # collects the distinct keys. The table is owned by LLMAgent.DurableLog;
+  # we only read it and never open, write, or close it.
+  defp durable_log_agent_ids do
+    :dets.foldl(
+      fn {agent_id, _event}, acc -> MapSet.put(acc, agent_id) end,
+      MapSet.new(),
+      :llmagent_durable_log
+    )
+    |> MapSet.to_list()
+  rescue
+    # DETS table not open or unavailable; no historical agents to add.
+    _e in [ArgumentError, RuntimeError] -> []
   end
 end

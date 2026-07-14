@@ -3,10 +3,6 @@ defmodule AgentoWeb.ChatLiveTest do
   Integration tests for Chat LiveView (R1) and Agent Management (R2).
   Tests run against the live LLMAgent supervision tree with TestLLMClient.
 
-  Known upstream bugs that affect some tests:
-  - tool_dispatch_block uses get_in(@event, [:data, :tool]) which fails because
-    Comn.Events.EventStruct doesn't implement Access.
-
   Prompt routing (ChatLive.send_prompt -> {:global, name}) is exercised by
   AgentoWeb.PromptRoutingTest.
   """
@@ -133,12 +129,10 @@ defmodule AgentoWeb.ChatLiveTest do
   end
 
   describe "Tool Dispatch Visibility (R1.5)" do
-    @tag :skip
-    @tag :upstream_bug
     test "tool dispatch events render inline in chat", %{conn: conn} do
-      # SKIPPED: ChatLive's tool_dispatch_block uses get_in(@event, [:data, :tool])
-      # which fails because Comn.Events.EventStruct doesn't implement Access.
-      # See chat_live.ex:399
+      # The TestLLMClient `use_tool` path returns a bash tool call, which drives
+      # a real dispatch and emits `agent.tool_dispatch` (carrying agent_id) plus
+      # a `tool.bash` invocation. The tool_dispatch_block renders those inline.
       {:ok, _pid} = start_test_agent(:chat_test_tool)
       Process.sleep(200)
 
@@ -149,6 +143,21 @@ defmodule AgentoWeb.ChatLiveTest do
 
       html = render(view)
       assert html =~ "Tool:" or html =~ "bash"
+    end
+
+    test "tool events for other agents are not shown in the selected chat", %{conn: conn} do
+      {:ok, _pid} = start_test_agent(:chat_test_tool_self)
+      {:ok, _pid} = start_test_agent(:chat_test_tool_other)
+      Process.sleep(200)
+
+      # Select one agent, but drive the tool on the *other* agent.
+      {:ok, view, _html} = live(conn, "/chat?agent=chat_test_tool_self")
+
+      send_prompt(:chat_test_tool_other, "use_tool")
+      Process.sleep(1000)
+
+      # The selected agent never ran a tool, so its chat shows no dispatch block.
+      refute render(view) =~ "Tool:"
     end
   end
 
@@ -184,6 +193,35 @@ defmodule AgentoWeb.ChatLiveTest do
       assert html =~ "chat_test_config"
       assert html =~ "sysadmin"
       assert html =~ "test-model"
+      # R2.3 — llm_client and memory modules surface in the config view.
+      assert html =~ "TestLLMClient"
+      assert html =~ "Memory.ETS"
+    end
+
+    test "new-agent form has llm_client and memory dropdowns (R2.1)", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/chat")
+
+      view |> element("button[phx-click=toggle_new_agent_form]") |> render_click()
+
+      assert has_element?(view, "select[name=llm_client]")
+      assert has_element?(view, "select[name=memory]")
+    end
+
+    test "manual endpoint entry reveals model and api_host fields (R2.1)", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/chat")
+
+      view |> element("button[phx-click=toggle_new_agent_form]") |> render_click()
+
+      # A "Manual entry" option exists in the endpoint dropdown.
+      assert has_element?(view, "select[name=endpoint] option[value=manual]")
+
+      # Selecting it reveals free-form model + api_host text inputs.
+      view
+      |> form("form[phx-submit=start_agent]", %{"endpoint" => "manual"})
+      |> render_change()
+
+      assert has_element?(view, "input[name=model]")
+      assert has_element?(view, "input[name=api_host]")
     end
 
     test "clear agent history (R2.4)", %{conn: conn} do

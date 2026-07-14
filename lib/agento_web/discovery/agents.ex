@@ -9,14 +9,16 @@ defmodule AgentoWeb.Discovery.Agents do
   @doc """
   Returns a list of maps describing all running agents.
 
-  Each map contains: pid, name, role, model, api_host, history_length.
+  Each map contains: pid, name, role, model, api_host, llm_client, memory,
+  history_length.
   """
   @spec list() :: [map()]
   def list do
     try do
       LLMAgent.AgentSupervisor.list_agents_with_state()
     rescue
-      _ -> []
+      # Supervisor absent, or agent-state shape drift, before the tree is up.
+      _e in [UndefinedFunctionError, ArgumentError, KeyError] -> []
     end
   end
 

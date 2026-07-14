@@ -5,6 +5,7 @@ defmodule AgentoWeb.HarnessController do
   """
   use AgentoWeb, :controller
 
+  alias AgentoWeb.Harness.Catalog
   alias AgentoWeb.Harness.Spec
 
   def specification(conn, _params) do
@@ -13,8 +14,8 @@ defmodule AgentoWeb.HarnessController do
     |> json(Spec.document())
   end
 
-  def agents(conn, _params), do: json(conn, %{"agents" => []})
-  def toolbox(conn, _params), do: json(conn, %{"tools" => []})
+  def agents(conn, _params), do: json(conn, %{"agents" => Catalog.agents()})
+  def toolbox(conn, _params), do: json(conn, %{"tools" => Catalog.toolbox()})
   def create(conn, _params), do: send_resp(conn, 501, "not implemented")
   def interact(conn, _params), do: send_resp(conn, 501, "not implemented")
 end

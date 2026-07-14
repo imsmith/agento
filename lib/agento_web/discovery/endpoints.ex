@@ -51,6 +51,7 @@ defmodule AgentoWeb.Discovery.Endpoints do
 
     :ok
   rescue
+    # Discovery module not loaded / not started — mount without live updates.
     _e in [ArgumentError, UndefinedFunctionError] -> :ok
   end
 
@@ -76,9 +77,69 @@ defmodule AgentoWeb.Discovery.Endpoints do
   end
 
   defp to_endpoint(%{id: id, binding: {:openai_chat, %{api_host: host} = payload}} = ad) do
-    model = payload[:model] || get_in(ad.operational || %{}, [:model_id]) || ""
-    %{id: to_string(id), api_host: host, model: model, label: "#{model} @ #{host}"}
+    case normalize_api_host(host) do
+      nil ->
+        nil
+
+      normalized ->
+        model = payload[:model] || get_in(ad.operational || %{}, [:model_id]) || ""
+        %{id: to_string(id), api_host: normalized, model: model, label: "#{model} @ #{normalized}"}
+    end
   end
 
   defp to_endpoint(_), do: nil
+
+  # Normalize a discovered api_host into a dialable URL, or nil if it can't be
+  # dialed. The mDNS shim joins address and port as `scheme://addr:port` with
+  # no brackets, so IPv6 literals arrive malformed. Bracket them; drop IPv6
+  # link-local (fe80::/10), which is unroutable without a zone id.
+  defp normalize_api_host(host) when is_binary(host) do
+    case String.split(host, "://", parts: 2) do
+      [scheme, rest] -> normalize_authority(scheme, rest, host)
+      [_only] -> host
+    end
+  end
+
+  defp normalize_api_host(_), do: nil
+
+  # `rest` is the authority `addr:port`. Already-bracketed IPv6 and non-IPv6
+  # (IPv4, hostname) pass through unchanged; a bare IPv6 literal gets bracketed
+  # unless it is link-local, in which case it is undialable and dropped.
+  defp normalize_authority(scheme, rest, original) do
+    cond do
+      String.contains?(rest, "]") ->
+        original
+
+      true ->
+        case split_host_port(rest) do
+          {addr, port} -> bracket_ipv6(scheme, addr, port, original)
+          :error -> original
+        end
+    end
+  end
+
+  defp bracket_ipv6(scheme, addr, port, original) do
+    cond do
+      not String.contains?(addr, ":") -> original
+      link_local?(addr) -> nil
+      true -> "#{scheme}://[#{addr}]:#{port}"
+    end
+  end
+
+  # Split on the trailing `:port` only; the host is everything before it.
+  defp split_host_port(rest) do
+    case rest |> String.split(":") |> Enum.reverse() do
+      [port | host_parts] ->
+        if port =~ ~r/^\d+$/ do
+          {host_parts |> Enum.reverse() |> Enum.join(":"), port}
+        else
+          :error
+        end
+
+      _ ->
+        :error
+    end
+  end
+
+  defp link_local?(addr), do: String.downcase(addr) =~ ~r/^fe[89ab][0-9a-f]:/
 end

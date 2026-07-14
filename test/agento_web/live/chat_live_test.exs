@@ -4,10 +4,11 @@ defmodule AgentoWeb.ChatLiveTest do
   Tests run against the live LLMAgent supervision tree with TestLLMClient.
 
   Known upstream bugs that affect some tests:
-  - ChatLive.send_prompt calls LLMAgent.prompt(atom, text) but agents register
-    as {:global, atom}. Prompts sent via the UI won't reach agents.
   - tool_dispatch_block uses get_in(@event, [:data, :tool]) which fails because
     Comn.Events.EventStruct doesn't implement Access.
+
+  Prompt routing (ChatLive.send_prompt -> {:global, name}) is exercised by
+  AgentoWeb.PromptRoutingTest.
   """
   use AgentoWeb.ConnCase
 
@@ -111,9 +112,7 @@ defmodule AgentoWeb.ChatLiveTest do
       |> render_submit()
 
       html = render(view)
-      # Prompt text should be cleared and thinking indicator shown
-      # Note: the actual LLM response may not arrive because of the
-      # global registration bug in ChatLive.send_prompt
+      # Prompt text should be cleared and thinking indicator shown.
       assert html =~ "loading" or html =~ "chat_test_prompt"
     end
 
@@ -121,7 +120,7 @@ defmodule AgentoWeb.ChatLiveTest do
       {:ok, _pid} = start_test_agent(:chat_test_history)
       Process.sleep(200)
 
-      # Send a prompt directly (bypassing UI to avoid global registration bug)
+      # Send a prompt directly to exercise DurableLog loading in isolation.
       send_prompt(:chat_test_history, "history test")
       Process.sleep(500)
 

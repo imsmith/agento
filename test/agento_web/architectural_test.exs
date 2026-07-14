@@ -151,8 +151,7 @@ defmodule AgentoWeb.ArchitecturalTest do
       |> form("form[phx-submit=start_agent]", %{
         "name" => "comn_start_evt",
         "role" => "sysadmin",
-        "model" => "test-model",
-        "api_host" => "http://localhost:11434/v1"
+        "endpoint" => "local"
       })
       |> render_change()
 
@@ -177,9 +176,11 @@ defmodule AgentoWeb.ArchitecturalTest do
           LLMAgent.AgentSupervisor.stop_agent(:comn_start_evt)
           LLMAgent.Memory.ETS.teardown(:comn_start_evt)
         rescue
-          _ -> :ok
+          # Absent durable log / ETS table during best-effort teardown.
+          _e in [ArgumentError] -> :ok
         catch
-          _, _ -> :ok
+          # Calls into already-dead processes (stop on a stopped agent).
+          :exit, _ -> :ok
         end
       end)
     end

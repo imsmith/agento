@@ -31,8 +31,7 @@ defmodule AgentoWeb.ChatLiveTest do
       |> form("form[phx-submit=start_agent]", %{
         "name" => "chat_test_start",
         "role" => "sysadmin",
-        "model" => "test-model",
-        "api_host" => "http://localhost:11434/v1"
+        "endpoint" => "local"
       })
       |> render_change()
 
@@ -50,9 +49,11 @@ defmodule AgentoWeb.ChatLiveTest do
           LLMAgent.AgentSupervisor.stop_agent(:chat_test_start)
           LLMAgent.Memory.ETS.teardown(:chat_test_start)
         rescue
-          _ -> :ok
+          # Absent durable log / ETS table during best-effort teardown.
+          _e in [ArgumentError] -> :ok
         catch
-          _, _ -> :ok
+          # Calls into already-dead processes (stop on a stopped agent).
+          :exit, _ -> :ok
         end
       end)
     end

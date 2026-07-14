@@ -26,6 +26,24 @@ config :LLMAgent,
   api_host: System.get_env("LLMAGENT_API_HOST", "http://localhost:11434/v1"),
   role: System.get_env("LLMAGENT_ROLE", "default")
 
+# Start LLMAgent's mDNS discovery shim from within agento.
+#
+# A dependency's own config/runtime.exs is NOT evaluated when it runs as a
+# library — only the top-level app's (agento's) config is. So agento must
+# configure the adapter itself, and resolve the shim from LLMAgent's priv
+# dir via app_dir/2 rather than File.cwd!() (which would point at agento's
+# nonexistent priv/discovery path).
+if tclsh = System.find_executable("tclsh") do
+  config :LLMAgent, :discovery_adapters, [
+    %{
+      name: :avahi_llama,
+      command: tclsh,
+      args: [Application.app_dir(:LLMAgent, "priv/discovery/avahi-llama.tcl")],
+      env: []
+    }
+  ]
+end
+
 config :agento, AgentoWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "0"))]
 

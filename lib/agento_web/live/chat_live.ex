@@ -6,15 +6,19 @@ defmodule AgentoWeb.ChatLive do
   use AgentoWeb, :live_view
 
   alias AgentoWeb.Discovery.Agents
+  alias AgentoWeb.Discovery.Endpoints
   alias Agento.EventBusBridge
 
   @impl true
   def mount(_params, _session, socket) do
     if connected?(socket) do
       Phoenix.PubSub.subscribe(EventBusBridge.pubsub(), EventBusBridge.pubsub_topic())
+      # Keep the endpoint dropdown live as LAN llama servers come and go.
+      Endpoints.subscribe(self())
     end
 
     agents = Agents.list()
+    options = endpoint_options()
 
     socket =
       socket
@@ -27,7 +31,8 @@ defmodule AgentoWeb.ChatLive do
         thinking: false,
         prompt_text: "",
         show_new_agent_form: false,
-        new_agent_form: default_new_agent_form(),
+        endpoint_options: options,
+        new_agent_form: default_new_agent_form(options),
         show_agent_config: false,
         confirm_stop: nil,
         confirm_clear: nil
@@ -73,6 +78,16 @@ defmodule AgentoWeb.ChatLive do
     {:noreply, socket}
   end
 
+  # Discovery change from Endpoints.subscribe/1 — re-render the dropdown so
+  # servers that appear (or expire) after mount are reflected live.
+  def handle_info({event, _ad_id, _coordinate}, socket) when is_atom(event) do
+    if event in Endpoints.change_events() do
+      {:noreply, refresh_endpoint_options(socket)}
+    else
+      {:noreply, socket}
+    end
+  end
+
   def handle_info(_msg, socket), do: {:noreply, socket}
 
   # -- User events --
@@ -111,13 +126,18 @@ defmodule AgentoWeb.ChatLive do
   end
 
   def handle_event("update_new_agent", params, socket) do
+    options = socket.assigns.endpoint_options
+    current = socket.assigns.new_agent_form
+    selected = Enum.find(options, &(&1.id == params["endpoint"])) || List.first(options)
+
     form =
-      socket.assigns.new_agent_form
+      current
       |> Map.merge(%{
-        name: Map.get(params, "name", ""),
-        role: Map.get(params, "role", ""),
-        model: Map.get(params, "model", ""),
-        api_host: Map.get(params, "api_host", "")
+        name: Map.get(params, "name", current.name),
+        role: Map.get(params, "role", current.role),
+        endpoint_id: selected.id,
+        model: selected.model,
+        api_host: selected.api_host
       })
 
     {:noreply, assign(socket, new_agent_form: form)}
@@ -137,13 +157,15 @@ defmodule AgentoWeb.ChatLive do
     case Agents.start(opts) do
       {:ok, _pid} ->
         AgentoWeb.WebEvents.emit_agent_started(name, opts)
+        options = endpoint_options()
 
         {:noreply,
          socket
          |> assign(
            agents: Agents.list(),
            show_new_agent_form: false,
-           new_agent_form: default_new_agent_form()
+           endpoint_options: options,
+           new_agent_form: default_new_agent_form(options)
          )
          |> put_flash(:info, "Agent #{name} started")}
 
@@ -235,7 +257,7 @@ defmodule AgentoWeb.ChatLive do
 
           <%= if @show_new_agent_form do %>
             <div class="p-3 border-b border-base-300 bg-base-100 space-y-2">
-              <.new_agent_form form={@new_agent_form} />
+              <.new_agent_form form={@new_agent_form} endpoint_options={@endpoint_options} />
             </div>
           <% end %>
 
@@ -489,20 +511,18 @@ defmodule AgentoWeb.ChatLive do
           {role}
         </option>
       </select>
-      <input
-        type="text"
-        name="model"
-        value={@form.model}
-        placeholder="Model (e.g. llama3.2)"
-        class="input input-bordered input-sm w-full"
-      />
-      <input
-        type="text"
-        name="api_host"
-        value={@form.api_host}
-        placeholder="API host"
-        class="input input-bordered input-sm w-full"
-      />
+      <select
+        name="endpoint"
+        class="select select-bordered select-sm w-full"
+      >
+        <option
+          :for={ep <- @endpoint_options}
+          value={ep.id}
+          selected={ep.id == @form.endpoint_id}
+        >
+          {ep.label}
+        </option>
+      </select>
       <div class="flex gap-1">
         <button type="submit" class="btn btn-primary btn-sm flex-1">Start</button>
         <button type="button" phx-click="toggle_new_agent_form" class="btn btn-ghost btn-sm">
@@ -593,12 +613,48 @@ defmodule AgentoWeb.ChatLive do
   defp role_bubble_class(role) when role in ["system", :system], do: "chat-bubble-neutral"
   defp role_bubble_class(_), do: "chat-bubble-secondary"
 
-  defp default_new_agent_form do
+  # Always-present fallback so the endpoint select is never empty, even
+  # before mDNS discovery has surfaced any LAN servers.
+  defp local_fallback do
+    %{
+      id: "local",
+      api_host: "http://localhost:11434/v1",
+      model: "llama3.2",
+      label: "llama3.2 @ localhost (fallback)"
+    }
+  end
+
+  defp endpoint_options do
+    Endpoints.list() ++ [local_fallback()]
+  end
+
+  # Recompute the dropdown after a discovery change, preserving the user's
+  # current selection when it still exists, otherwise snapping to the first
+  # available option.
+  defp refresh_endpoint_options(socket) do
+    options = endpoint_options()
+    form = socket.assigns.new_agent_form
+    selected = Enum.find(options, &(&1.id == form.endpoint_id)) || List.first(options)
+
+    form =
+      Map.merge(form, %{
+        endpoint_id: selected.id,
+        model: selected.model,
+        api_host: selected.api_host
+      })
+
+    assign(socket, endpoint_options: options, new_agent_form: form)
+  end
+
+  defp default_new_agent_form(options) do
+    ep = List.first(options) || local_fallback()
+
     %{
       name: "",
-      role: "sysadmin",
-      model: "llama3.2",
-      api_host: "http://localhost:11434/v1"
+      role: "default",
+      endpoint_id: ep.id,
+      model: ep.model,
+      api_host: ep.api_host
     }
   end
 

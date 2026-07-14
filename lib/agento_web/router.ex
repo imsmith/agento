@@ -15,6 +15,23 @@ defmodule AgentoWeb.Router do
     plug :accepts, ["json"]
   end
 
+  # No :accepts plug — the Accept header is repurposed for agent negotiation
+  # on GET /harness, so standard content negotiation must not run here.
+  pipeline :harness do
+    plug :put_format, :json
+  end
+
+  scope "/", AgentoWeb do
+    pipe_through :harness
+
+    match :options, "/", HarnessController, :specification
+    get "/specification", HarnessController, :specification
+    get "/agents", HarnessController, :agents
+    get "/toolbox", HarnessController, :toolbox
+    get "/harness", HarnessController, :create
+    put "/harness/:session_id", HarnessController, :interact
+  end
+
   scope "/", AgentoWeb do
     pipe_through :browser
 

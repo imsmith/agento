@@ -95,9 +95,12 @@ is the normative contract; the shapes below are illustrative.
 ### `GET /specification` and `OPTIONS /`
 
 Return the OpenAPI 3.x document describing this API. Served as JSON
-(`application/openapi+json` / `application/json`). Generated at runtime from the
-app's own route/introspection data rather than a checked-in static file, so it
-cannot drift from the implementation.
+(`application/openapi+json` / `application/json`). For this first slice the
+document is hand-authored in `AgentoWeb.Harness.Spec` rather than a checked-in
+static file, so it ships with the code and is covered by a route-coverage test
+that keeps documented paths and live routes in sync. Runtime route-introspection
+generation (deriving the document directly from the router) is a future
+refinement, not yet implemented.
 
 ### `GET /agents`
 

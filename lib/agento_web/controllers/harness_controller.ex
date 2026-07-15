@@ -76,7 +76,8 @@ defmodule AgentoWeb.HarnessController do
         LLMAgent.prompt({:global, session.agent}, user_content)
 
         conn = conn |> put_resp_content_type("application/x-ndjson") |> send_chunked(200)
-        {conn, frames} = stream_live(conn, session, req_ts, [])
+        {conn, frames} = stream_live(conn, session, req_ts, [], new_deadline())
+        Phoenix.PubSub.unsubscribe(EventBusBridge.pubsub(), EventBusBridge.pubsub_topic())
 
         hash = Session.context_hash(context)
         {:ok, _next} = Registry.commit_turn(session.id, session.fold, hash, frames)
@@ -84,24 +85,35 @@ defmodule AgentoWeb.HarnessController do
     end
   end
 
-  defp stream_live(conn, session, req_ts, acc) do
+  defp new_deadline, do: System.monotonic_time(:millisecond) + @idle_close_ms
+
+  defp stream_live(conn, session, req_ts, acc, deadline) do
+    remaining = max(0, deadline - System.monotonic_time(:millisecond))
+
     receive do
       {topic, %Comn.Events.EventStruct{} = event} ->
         case frame_for(topic, event, session.agent, req_ts, session.fold + 1) do
           nil ->
-            stream_live(conn, session, req_ts, acc)
+            # Event for another session or a non-frame topic — drain WITHOUT
+            # extending our idle window, so other tenants' activity can't hold
+            # this stream open.
+            stream_live(conn, session, req_ts, acc, deadline)
 
           frame ->
-            {:ok, conn} = chunk(conn, Jason.encode!(frame) <> "\n")
-            stream_live(conn, session, req_ts, [frame | acc])
+            case chunk(conn, Jason.encode!(frame) <> "\n") do
+              {:ok, conn} ->
+                stream_live(conn, session, req_ts, [frame | acc], new_deadline())
+
+              {:error, _reason} ->
+                # Client disconnected mid-stream — stop cleanly.
+                {conn, Enum.reverse(acc)}
+            end
         end
 
       _other ->
-        # Ignore unrelated mailbox messages (e.g. Plug.Test's own {ref, response}
-        # delivery for earlier requests dispatched in this same test process).
-        stream_live(conn, session, req_ts, acc)
+        stream_live(conn, session, req_ts, acc, deadline)
     after
-      @idle_close_ms -> {conn, Enum.reverse(acc)}
+      remaining -> {conn, Enum.reverse(acc)}
     end
   end
 

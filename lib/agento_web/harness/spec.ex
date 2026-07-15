@@ -19,14 +19,23 @@ defmodule AgentoWeb.Harness.Spec do
         "/agents" => %{"get" => op("List instantiable agent types.")},
         "/toolbox" => %{"get" => op("List available tools.")},
         "/harness" => %{
-          "get" => op("Provision a session. Agent type negotiated via the Accept header.")
+          "get" =>
+            op("Provision a session. Agent type negotiated via the Accept header.", %{
+              "201" => %{"description" => "Session created"}
+            })
         },
         "/harness/{session_id}" => %{
-          "put" => op("Interact: PUT context-since-fold; stream NDJSON result frames.")
+          "put" =>
+            op("Interact: PUT context-since-fold; stream NDJSON result frames.", %{
+              "200" => %{"description" => "NDJSON stream"},
+              "404" => %{"description" => "Unknown session"},
+              "409" => %{"description" => "Fold diverged"}
+            })
         }
       }
     }
   end
 
-  defp op(summary), do: %{"summary" => summary, "responses" => %{"200" => %{"description" => "OK"}}}
+  defp op(summary), do: op(summary, %{"200" => %{"description" => "OK"}})
+  defp op(summary, responses), do: %{"summary" => summary, "responses" => responses}
 end

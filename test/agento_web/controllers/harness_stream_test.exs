@@ -53,4 +53,48 @@ defmodule AgentoWeb.HarnessStreamTest do
 
     assert conn.status == 404
   end
+
+  defp flood(other) do
+    Phoenix.PubSub.broadcast(
+      Agento.EventBusBridge.pubsub(),
+      Agento.EventBusBridge.pubsub_topic(),
+      {other.topic, other}
+    )
+
+    Process.sleep(100)
+    flood(other)
+  end
+
+  test "unrelated events on the global topic don't hold the stream open", %{conn: conn} do
+    s = open_session(conn)
+    on_exit_stop_agent(s["session_id"])
+
+    other = %Comn.Events.EventStruct{
+      type: :message,
+      topic: "agent.message",
+      data: %{agent_id: :some_other_agent, role: "assistant", content: "noise"},
+      timestamp: DateTime.utc_now() |> DateTime.to_iso8601(),
+      source: __MODULE__
+    }
+
+    flooder = spawn(fn -> flood(other) end)
+    on_exit(fn -> Process.exit(flooder, :kill) end)
+
+    task =
+      Task.async(fn ->
+        conn
+        |> put_req_header("content-type", "application/json")
+        |> put("/harness/#{s["session_id"]}", %{
+          "fold" => s["fold"],
+          "context" => [%{"role" => "user", "content" => "hello there"}]
+        })
+      end)
+
+    conn = Task.await(task, 6_000)
+
+    assert conn.status == 200
+    frames = conn.resp_body |> String.split("\n", trim: true) |> Enum.map(&Jason.decode!/1)
+    msg = Enum.find(frames, &(&1["type"] == "message"))
+    assert msg["data"]["content"] =~ "test response"
+  end
 end

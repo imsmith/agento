@@ -47,13 +47,22 @@ MCP / A2A / arbitrary APIs). This document specs only the slice below.
 
 ## Core concepts
 
-### Session = agent instance
+### Session = record (not a process)
 
-A harness session **is** an `LLMAgent` agent started under
-`LLMAgent.AgentSupervisor` (a `DynamicSupervisor`). This gives multi-tenancy,
-isolated per-session memory/history, the tool substrate, and the prompt/response
-loop for free. The `session_id` is the handle; internally it maps to the agent's
-registered name.
+A harness session is **web-tier state**: a record in `Harness.Registry` keyed by
+an opaque string `session_id`, holding the chosen agent type, endpoint, tool
+policy, LLM client, the canonical conversation `history`, the current `fold`, and
+memoized frames. There is **no per-session process and no session-named atom** —
+sessions are data. A lease (`expires_at`, renewed each turn) plus a periodic
+sweep drop idle records.
+
+A turn runs as a **function call over that record** (`Harness.Turn`), composing
+LLMAgent's standalone competence — the LLM client and the tool registry — rather
+than proxying to a long-lived per-session agent. The backend is a work pool the
+turn borrows, not the session's identity. (This is why the API scales: the old
+"session = a named `LLMAgent` agent" design minted a non-GC'd atom per session
+and leaked the backend process pool into the web session table; anchoring
+identity on a web-tier record removes both.)
 
 ### Fold
 

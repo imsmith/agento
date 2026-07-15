@@ -9,9 +9,11 @@ defmodule AgentoWeb.HarnessController do
   alias AgentoWeb.Harness.Registry
   alias AgentoWeb.Harness.Session
   alias AgentoWeb.Harness.Spec
-  alias Agento.EventBusBridge
+  alias AgentoWeb.Harness.Turn
 
-  @idle_close_ms 1_500
+  # Safety ceiling on how long the controller waits for a turn to finish before
+  # closing the stream. Not a completion heuristic — the turn signals done.
+  @turn_timeout_ms 180_000
 
   def specification(conn, _params) do
     conn
@@ -24,23 +26,16 @@ defmodule AgentoWeb.HarnessController do
 
   def create(conn, _params) do
     agent_type = Session.negotiate_agent(get_req_header(conn, "accept"))
+    {:ok, session} = Session.open(agent_type)
 
-    case Session.open(agent_type) do
-      {:ok, session} ->
-        conn
-        |> put_status(201)
-        |> json(%{
-          "session_id" => session.id,
-          "agent" => to_string(session.agent_type),
-          "fold" => "fold_#{session.fold}",
-          "expires_at" => DateTime.to_iso8601(session.expires_at)
-        })
-
-      {:error, reason} ->
-        conn
-        |> put_status(502)
-        |> json(error_body("agent_start_failed", nil, "could not start agent: #{inspect(reason)}"))
-    end
+    conn
+    |> put_status(201)
+    |> json(%{
+      "session_id" => session.id,
+      "agent" => to_string(session.config.agent_type),
+      "fold" => "fold_#{session.fold}",
+      "expires_at" => DateTime.to_iso8601(session.expires_at)
+    })
   end
 
   def interact(conn, %{"session_id" => sid} = params) do
@@ -71,49 +66,51 @@ defmodule AgentoWeb.HarnessController do
         stream_static(conn, frames)
 
       {:process, user_content} ->
-        Registry.renew(session.id)
-        Phoenix.PubSub.subscribe(EventBusBridge.pubsub(), EventBusBridge.pubsub_topic())
-        LLMAgent.prompt({:global, session.agent}, user_content)
-
-        conn = conn |> put_resp_content_type("application/x-ndjson") |> send_chunked(200)
-        {conn, frames} = stream_live(conn, session, req_ts, [], new_deadline())
-        Phoenix.PubSub.unsubscribe(EventBusBridge.pubsub(), EventBusBridge.pubsub_topic())
-
-        hash = Session.context_hash(context)
-        {:ok, _next} = Registry.commit_turn(session.id, session.fold, hash, frames)
-        conn
+        run_turn(conn, session, context, user_content, req_ts)
     end
   end
 
-  defp new_deadline, do: System.monotonic_time(:millisecond) + @idle_close_ms
+  # Run the turn in a task, streaming each frame to this process, then commit.
+  defp run_turn(conn, session, context, user_content, req_ts) do
+    Registry.renew(session.id)
+    fold_str = "fold_#{session.fold + 1}"
+    parent = self()
 
-  defp stream_live(conn, session, req_ts, acc, deadline) do
-    remaining = max(0, deadline - System.monotonic_time(:millisecond))
+    Task.start(fn ->
+      emit = fn frame -> send(parent, {:frame, frame}) end
+      {:ok, history} = Turn.run(session.config, session.history, user_content, emit)
+      send(parent, {:turn_done, history})
+    end)
 
+    conn = conn |> put_resp_content_type("application/x-ndjson") |> send_chunked(200)
+    {conn, frames, history} = collect(conn, req_ts, fold_str, [])
+
+    # Only commit when the turn actually completed (history present). On a
+    # mid-stream client disconnect we leave the session untouched so a retry
+    # reprocesses rather than committing a partial turn.
+    if history do
+      hash = Session.context_hash(context)
+      {:ok, _next} = Registry.commit_turn(session.id, session.fold, hash, frames, history)
+    end
+
+    conn
+  end
+
+  defp collect(conn, req_ts, fold_str, acc) do
     receive do
-      {topic, %Comn.Events.EventStruct{} = event} ->
-        case frame_for(topic, event, session.agent, req_ts, session.fold + 1) do
-          nil ->
-            # Event for another session or a non-frame topic — drain WITHOUT
-            # extending our idle window, so other tenants' activity can't hold
-            # this stream open.
-            stream_live(conn, session, req_ts, acc, deadline)
+      {:frame, frame} ->
+        wrapped = Map.merge(frame, %{"req_ts" => req_ts, "fold" => fold_str})
 
-          frame ->
-            case chunk(conn, Jason.encode!(frame) <> "\n") do
-              {:ok, conn} ->
-                stream_live(conn, session, req_ts, [frame | acc], new_deadline())
-
-              {:error, _reason} ->
-                # Client disconnected mid-stream — stop cleanly.
-                {conn, Enum.reverse(acc)}
-            end
+        case chunk(conn, Jason.encode!(wrapped) <> "\n") do
+          {:ok, conn} -> collect(conn, req_ts, fold_str, [wrapped | acc])
+          # Client disconnected mid-stream — stop; do not commit (history nil).
+          {:error, _reason} -> {conn, Enum.reverse(acc), nil}
         end
 
-      _other ->
-        stream_live(conn, session, req_ts, acc, deadline)
+      {:turn_done, history} ->
+        {conn, Enum.reverse(acc), history}
     after
-      remaining -> {conn, Enum.reverse(acc)}
+      @turn_timeout_ms -> {conn, Enum.reverse(acc), nil}
     end
   end
 
@@ -125,43 +122,6 @@ defmodule AgentoWeb.HarnessController do
       c
     end)
   end
-
-  defp frame_for(topic, event, agent, req_ts, fold) do
-    data = event.data || %{}
-    if agent_of(data) == agent, do: build_frame(topic, data, req_ts, fold), else: nil
-  end
-
-  defp agent_of(data), do: data[:agent_id] || data["agent_id"]
-
-  defp build_frame("agent.tool_dispatch", data, req_ts, fold),
-    do: frame("tool_dispatch", data, req_ts, fold)
-
-  defp build_frame("agent.error", data, req_ts, fold), do: frame("error", data, req_ts, fold)
-
-  defp build_frame("tool." <> _name, data, req_ts, fold),
-    do: frame("tool_result", data, req_ts, fold)
-
-  defp build_frame("agent.message", %{role: "assistant"} = data, req_ts, fold),
-    do: frame("message", data, req_ts, fold)
-
-  defp build_frame("agent.message", %{"role" => "assistant"} = data, req_ts, fold),
-    do: frame("message", data, req_ts, fold)
-
-  defp build_frame(_topic, _data, _req_ts, _fold), do: nil
-
-  defp frame(type, data, req_ts, fold) do
-    %{"req_ts" => req_ts, "type" => type, "data" => sanitize(data), "fold" => "fold_#{fold}"}
-  end
-
-  defp sanitize(data) when is_map(data) do
-    Map.new(data, fn {k, v} -> {to_string(k), sanitize_value(v)} end)
-  end
-
-  defp sanitize_value(v) when is_binary(v) and byte_size(v) > 4_000,
-    do: String.slice(v, 0, 4_000) <> "...(truncated)"
-
-  defp sanitize_value(v) when is_atom(v) and not is_boolean(v) and not is_nil(v), do: to_string(v)
-  defp sanitize_value(v), do: v
 
   defp error_body(reason, field, message) do
     %{"error" => %{"reason" => reason, "field" => field, "message" => message, "suggestion" => nil}}

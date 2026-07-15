@@ -1,8 +1,12 @@
 defmodule AgentoWeb.Harness.Session do
   @moduledoc """
-  Per-session orchestration for the harness: negotiate the agent type, start the
-  backing `LLMAgent` agent bound to a discovered endpoint, and (later) reconcile
-  folds and drive interaction. A session IS an `LLMAgent` agent instance.
+  Session orchestration for the harness: negotiate the agent type, open a
+  session **record** (not a process), and reconcile folds.
+
+  A session is web-tier state — a record in `Harness.Registry` holding the
+  chosen agent type, endpoint, tool policy, and the canonical conversation.
+  Turns run as function calls over that record (`Harness.Turn`); nothing is
+  spawned or named per session.
   """
 
   alias AgentoWeb.Harness.{Catalog, Registry}
@@ -22,36 +26,27 @@ defmodule AgentoWeb.Harness.Session do
     Enum.find(wanted, &(&1 in ids)) |> to_role()
   end
 
-  @spec open(atom()) :: {:ok, map()} | {:error, term()}
+  @spec open(atom()) :: {:ok, map()}
   def open(agent_type) do
     {model, api_host} = endpoint()
-    name = String.to_atom("hns_agent_" <> Integer.to_string(System.unique_integer([:positive])))
 
-    opts = [
-      name: name,
-      role: agent_type,
+    config = %{
+      agent_type: agent_type,
       model: model,
       api_host: api_host,
-      # Tool policy for harness-backed agents. The spec calls for deny-by-default;
-      # this reads config so deployments can restrict it. Default is intentionally
+      # Tool policy for harness turns. The spec calls for deny-by-default; this
+      # reads config so deployments can restrict it. Default is intentionally
       # permissive for now — the SAME security surface deferred for the web UI's
       # R6.3 (gate on auth). Restrict via config/runtime.exs before exposing the
       # API off a trusted network. `:all` or a list of tool atoms.
       allowed_tools: Application.get_env(:agento, :harness_allowed_tools, :all),
-      # LLMAgent.init reads :llm_client from start opts, not app config, so this
-      # must be threaded through explicitly for harness-started agents to honor
-      # the test-env stub configured under :agento, :harness_llm_client.
+      # The LLM client the turn loop uses. Test env overrides this via
+      # `config :agento, :harness_llm_client, AgentoWeb.TestLLMClient`.
       llm_client: Application.get_env(:agento, :harness_llm_client, LLMAgent.LLMClient.OpenAI)
-    ]
+    }
 
-    case LLMAgent.AgentSupervisor.start_agent(opts) do
-      {:ok, _pid} ->
-        {:ok, session} = Registry.create(name, @default_ttl_ms)
-        {:ok, Map.put(session, :agent_type, agent_type)}
-
-      {:error, reason} ->
-        {:error, reason}
-    end
+    history = [%{role: "system", content: LLMAgent.RolePrompt.get(agent_type)}]
+    Registry.create(config, history, @default_ttl_ms)
   end
 
   @spec fold_token(non_neg_integer()) :: String.t()

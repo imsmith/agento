@@ -2,99 +2,58 @@ defmodule AgentoWeb.HarnessStreamTest do
   @moduledoc false
   use AgentoWeb.ConnCase
 
-  defp open_session(conn) do
-    conn |> get("/harness") |> json_response(201)
+  defp open_session(conn), do: conn |> get("/harness") |> json_response(201)
+
+  defp put_turn(conn, sid, fold, user) do
+    conn
+    |> put_req_header("content-type", "application/json")
+    |> put("/harness/#{sid}", %{
+      "fold" => fold,
+      "context" => [%{"role" => "user", "content" => user}]
+    })
   end
 
-  defp on_exit_stop_agent(session_id) do
-    ExUnit.Callbacks.on_exit(fn ->
-      case AgentoWeb.Harness.Registry.lookup(session_id) do
-        {:ok, %{agent: agent}} ->
-          try do
-            LLMAgent.AgentSupervisor.stop_agent(agent)
-          rescue
-            # Agent may already be gone by teardown time; not worth failing the suite over.
-            _e in [RuntimeError, ArgumentError] -> :ok
-          catch
-            _, _ -> :ok
-          end
-
-        _ ->
-          :ok
-      end
-    end)
-  end
+  defp frames(conn), do: conn.resp_body |> String.split("\n", trim: true) |> Enum.map(&Jason.decode!/1)
 
   test "PUT streams an assistant message frame tagged with req_ts and fold", %{conn: conn} do
     s = open_session(conn)
-    on_exit_stop_agent(s["session_id"])
-
-    conn =
-      conn
-      |> put_req_header("content-type", "application/json")
-      |> put("/harness/#{s["session_id"]}", %{
-        "fold" => s["fold"],
-        "context" => [%{"role" => "user", "content" => "hello there"}]
-      })
+    conn = put_turn(conn, s["session_id"], s["fold"], "hello there")
 
     assert conn.status == 200
-    frames = conn.resp_body |> String.split("\n", trim: true) |> Enum.map(&Jason.decode!/1)
-    msg = Enum.find(frames, &(&1["type"] == "message"))
+    msg = Enum.find(frames(conn), &(&1["type"] == "message"))
     assert msg["data"]["content"] =~ "test response"
     assert is_binary(msg["req_ts"])
     assert msg["fold"] == "fold_1"
   end
 
-  test "PUT on an unknown session returns 404", %{conn: conn} do
-    conn =
-      conn
-      |> put_req_header("content-type", "application/json")
-      |> put("/harness/nope", %{"fold" => "fold_0", "context" => []})
-
-    assert conn.status == 404
-  end
-
-  defp flood(other) do
-    Phoenix.PubSub.broadcast(
-      Agento.EventBusBridge.pubsub(),
-      Agento.EventBusBridge.pubsub_topic(),
-      {other.topic, other}
-    )
-
-    Process.sleep(100)
-    flood(other)
-  end
-
-  test "unrelated events on the global topic don't hold the stream open", %{conn: conn} do
+  test "PUT with a tool-triggering turn streams tool_dispatch + tool_result before the message", %{conn: conn} do
     s = open_session(conn)
-    on_exit_stop_agent(s["session_id"])
-
-    other = %Comn.Events.EventStruct{
-      type: :message,
-      topic: "agent.message",
-      data: %{agent_id: :some_other_agent, role: "assistant", content: "noise"},
-      timestamp: DateTime.utc_now() |> DateTime.to_iso8601(),
-      source: __MODULE__
-    }
-
-    flooder = spawn(fn -> flood(other) end)
-    on_exit(fn -> Process.exit(flooder, :kill) end)
-
-    task =
-      Task.async(fn ->
-        conn
-        |> put_req_header("content-type", "application/json")
-        |> put("/harness/#{s["session_id"]}", %{
-          "fold" => s["fold"],
-          "context" => [%{"role" => "user", "content" => "hello there"}]
-        })
-      end)
-
-    conn = Task.await(task, 6_000)
+    conn = put_turn(conn, s["session_id"], s["fold"], "use_tool")
 
     assert conn.status == 200
-    frames = conn.resp_body |> String.split("\n", trim: true) |> Enum.map(&Jason.decode!/1)
-    msg = Enum.find(frames, &(&1["type"] == "message"))
-    assert msg["data"]["content"] =~ "test response"
+    fs = frames(conn)
+    dispatch = Enum.find(fs, &(&1["type"] == "tool_dispatch"))
+    result = Enum.find(fs, &(&1["type"] == "tool_result"))
+    message = Enum.find(fs, &(&1["type"] == "message"))
+
+    assert dispatch["data"]["tool"] == "bash"
+    assert result["data"]["status"] == "ok"
+    assert message != nil
+    # ordering: the tool frames precede the final message
+    assert Enum.find_index(fs, &(&1 == dispatch)) < Enum.find_index(fs, &(&1 == message))
+  end
+
+  test "fold advances across turns", %{conn: conn} do
+    s = open_session(conn)
+    c1 = put_turn(conn, s["session_id"], "fold_0", "first")
+    assert frames(c1) |> Enum.find(&(&1["type"] == "message")) |> Map.get("fold") == "fold_1"
+
+    c2 = put_turn(conn, s["session_id"], "fold_1", "second")
+    assert frames(c2) |> Enum.find(&(&1["type"] == "message")) |> Map.get("fold") == "fold_2"
+  end
+
+  test "PUT on an unknown session returns 404", %{conn: conn} do
+    conn = put_turn(conn, "nope", "fold_0", "hi")
+    assert conn.status == 404
   end
 end

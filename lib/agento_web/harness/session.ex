@@ -37,7 +37,11 @@ defmodule AgentoWeb.Harness.Session do
       # permissive for now — the SAME security surface deferred for the web UI's
       # R6.3 (gate on auth). Restrict via config/runtime.exs before exposing the
       # API off a trusted network. `:all` or a list of tool atoms.
-      allowed_tools: Application.get_env(:agento, :harness_allowed_tools, :all)
+      allowed_tools: Application.get_env(:agento, :harness_allowed_tools, :all),
+      # LLMAgent.init reads :llm_client from start opts, not app config, so this
+      # must be threaded through explicitly for harness-started agents to honor
+      # the test-env stub configured under :agento, :harness_llm_client.
+      llm_client: Application.get_env(:agento, :harness_llm_client, LLMAgent.LLMClient.OpenAI)
     ]
 
     case LLMAgent.AgentSupervisor.start_agent(opts) do

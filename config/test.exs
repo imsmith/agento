@@ -27,3 +27,7 @@ config :LLMAgent,
   api_host: "http://localhost:11434/v1",
   role: "sysadmin",
   llm_client: AgentoWeb.TestLLMClient
+
+# LLMAgent.init reads :llm_client from start opts, not app config, so
+# AgentoWeb.Harness.Session.open/1 threads this through explicitly.
+config :agento, harness_llm_client: AgentoWeb.TestLLMClient

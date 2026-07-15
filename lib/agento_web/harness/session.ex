@@ -71,24 +71,28 @@ defmodule AgentoWeb.Harness.Session do
   @spec reconcile(String.t(), String.t(), list()) ::
           {:process, String.t()} | {:replay, [map()]} | {:diverged, String.t()} | {:error, :not_found}
   def reconcile(session_id, fold_str, context) do
-    with {:ok, fold} <- parse_fold(fold_str),
-         {:ok, current} <- Registry.current_fold(session_id) do
-      hash = context_hash(context)
+    case Registry.current_fold(session_id) do
+      {:error, :not_found} ->
+        {:error, :not_found}
 
-      cond do
-        fold == current ->
-          {:process, last_user_content(context)}
+      {:ok, current} ->
+        reconcile_known(session_id, fold_str, context, current)
+    end
+  end
 
-        match?({:ok, _}, Registry.replay(session_id, fold, hash)) ->
-          {:ok, frames} = Registry.replay(session_id, fold, hash)
-          {:replay, frames}
+  defp reconcile_known(session_id, fold_str, context, current) do
+    case parse_fold(fold_str) do
+      :error ->
+        {:diverged, fold_token(current)}
 
-        true ->
-          {:diverged, fold_token(current)}
-      end
-    else
-      :error -> {:diverged, "fold_0"}
-      {:error, :not_found} -> {:error, :not_found}
+      {:ok, ^current} ->
+        {:process, last_user_content(context)}
+
+      {:ok, fold} ->
+        case Registry.replay(session_id, fold, context_hash(context)) do
+          {:ok, frames} -> {:replay, frames}
+          :miss -> {:diverged, fold_token(current)}
+        end
     end
   end
 

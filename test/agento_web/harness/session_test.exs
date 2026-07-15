@@ -31,4 +31,15 @@ defmodule AgentoWeb.Harness.SessionTest do
     ctx = [%{"role" => "user", "content" => "new"}]
     assert {:diverged, "fold_1"} = Session.reconcile(s.id, "fold_0", ctx)
   end
+
+  test "reconcile: unknown session with malformed fold → error not_found" do
+    assert {:error, :not_found} = Session.reconcile("no_such_session", "garbage", [])
+  end
+
+  test "reconcile: known session with malformed fold → diverged with real current fold" do
+    {:ok, s} = Registry.create(:sess_test_d, 60_000)
+    {:ok, 1} = Registry.commit_turn(s.id, 0, "otherhash", [])
+    ctx = [%{"role" => "user", "content" => "new"}]
+    assert {:diverged, "fold_1"} = Session.reconcile(s.id, "garbage", ctx)
+  end
 end

@@ -31,6 +31,15 @@ defmodule AgentoWeb.HarnessControllerTest do
     end
   end
 
+  describe "spec matches routes" do
+    test "every documented path is a live route", %{conn: conn} do
+      body = conn |> get("/specification") |> json_response(200)
+      documented = body["paths"] |> Map.keys() |> Enum.reject(&String.contains?(&1, "{"))
+      routes = AgentoWeb.Router.__routes__() |> Enum.map(& &1.path)
+      for path <- documented, do: assert(path in routes, "#{path} documented but not routed")
+    end
+  end
+
   describe "GET /harness" do
     test "provisions a session with a default agent and a fold", %{conn: conn} do
       body = conn |> get("/harness") |> json_response(201)

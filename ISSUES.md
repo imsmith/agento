@@ -16,7 +16,7 @@ Audited the codebase against PRD-PHOENIX-UI.md: **28 of 39 requirements MET, 11 
 
 **DEFER** -- we can defer this and accept the security risk while we develop the features between what we have now and when we have auth by simply gating release on auth functionality.
 
-**Planned Fix:** Implement users, authentication, and authorization.  Use `Application.compile_env(:agento, :enable_tool_invocation, false)`; hide the invocation card and reject the `invoke_tool` event unless enabled if required to move forward without auth.
+**Planned Fix:** **Primary** Implement users, authentication, and authorization.  **Secondary** Use `Application.compile_env(:agento, :enable_tool_invocation, false)`; hide the invocation card and reject the `invoke_tool` event unless enabled if required to move forward without auth.
 
 ### ~~R2.1 / R2.3 / VA3 — `llm_client` and `memory` dimension is unwired~~
 
@@ -94,20 +94,19 @@ Per-event category labels are computed via `Comn.Errors.categorize/1` (`lib/agen
 
 **Resolved** — kept the discovery dropdown and added a "Manual entry" option that reveals free-form `model` + `api_host` text inputs.
 
-
 PRD R2.1 lists `model` and `api_host` as text fields; they were replaced by the mDNS-discovered endpoint dropdown plus a `local` fallback (`lib/agento_web/live/chat_live.ex:519-530`). This supplies both values and is a UX improvement, but removes free-form entry. Decision needed: keep the dropdown and optionally add a manual-override option.
 
 **Fix** add a "manual entry" option to the dropdown that reveals the text fields.
+
 ---
 
 ## 2026-06-14 things I noticed while working on the PRD audit
 
-### make sure we're tracking the changes upstream in 'comn' and 'busybody' and integrating them into agento as appropriate.
+### 1. make sure we're tracking the changes upstream in 'comn' and 'busybody' and integrating them into agento as appropriate
 
-### update the readme to reflect that busybody is a dependency and that can eliminate the need for env vars for the most part.
+### 2. update the readme to reflect that busybody is a dependency and that can eliminate the need for env vars for the most part
 
-### we aren't passing any context to the llm, so it doesn't know about tools or the system prompt.  We should be passing the context to the llm so it can make better decisions about what to do.
-
+### 3. we aren't passing any context to the llm, so it doesn't know about tools or the system prompt.  We should be passing the context to the llm so it can make better decisions about what to do
 
 ## 2026-05-03
 

@@ -1,0 +1,67 @@
+model {
+    extend agento {
+
+        endpoint = container {
+            title 'Web Endpoint'
+            description 'Phoenix endpoint and router. Serves priv/static, the /live socket, a :browser pipeline, an :api pipeline and a :harness pipeline that deliberately omits :accepts so the Accept header can carry agent negotiation.'
+            technology 'Phoenix.Endpoint / Bandit / Plug'
+        }
+
+        live_ui = container {
+            title 'LiveView UI'
+            description 'Four LiveViews under a single live_session with the Observability on_mount hook, plus core components, layouts, the home redirect and the JSON export controller.'
+            technology 'Phoenix LiveView 1.1 / HEEx / Tailwind'
+        }
+
+        harness = container {
+            title 'Harness API'
+            description 'Self-describing multi-tenant HTTP harness over LLMAgent. Sessions are records, not processes; turns are function calls that stream frames out through an emit callback.'
+            technology 'Phoenix Controller + GenServer session store'
+        }
+
+        discovery_facade = container {
+            title 'Discovery Facade'
+            description 'Boundary modules that project LLMAgent state into shapes the UI can render: running agents, registered tools, LAN LLM endpoints, observed event topics and behaviour implementations.'
+            technology 'Elixir modules + Agent'
+        }
+
+        event_bridge = container {
+            title 'Event Bridge'
+            description 'Subscribes to LLMAgent.EventBus topics and rebroadcasts onto Phoenix.PubSub topic "agento:events" so many LiveViews share one stream. Polls LLMAgent.Tools every 30s to pick up new topics. Also emits the web.* events.'
+            technology 'Elixir GenServer + Phoenix.PubSub'
+        }
+
+        telemetry = container {
+            title 'Telemetry'
+            description 'Supervisor running :telemetry_poller on a 10s period and declaring the Phoenix and VM metric definitions. No reporter is attached.'
+            technology 'telemetry_metrics / telemetry_poller'
+        }
+
+        endpoint -[ipc]-> live_ui "Routes /chat, /events, /system, /tools and /export/:agent"
+        endpoint -[ipc]-> harness "Routes the harness scope"
+        live_ui -[ipc]-> discovery_facade "Reads agents, tools, endpoints, topics and behaviours"
+        live_ui -[message]-> event_bridge "Subscribes to agento:events; emits web.mount and web.event"
+        harness -[ipc]-> discovery_facade "Catalog reads role prompts and the tool list"
+        event_bridge -[ipc]-> discovery_facade "Discovers tool and tracked topics on each poll"
+    }
+
+    browser_user -[http]-> agento.endpoint "HTTP and websocket"
+    harness_client -[http]-> agento.endpoint "Harness requests"
+
+    agento.live_ui -[ipc]-> llmagent "Prompts agents, starts and stops them, reads the event log and durable log"
+    agento.harness -[ipc]-> llmagent "Composes the LLM client and tool registry over a session record"
+    agento.discovery_facade -[ipc]-> llmagent "AgentSupervisor, Tools, Tools.Discovery and behaviour scans"
+    agento.event_bridge -[message]-> llmagent "Registers on EventBus topics; emits through LLMAgent.Events"
+    agento.live_ui -[ipc]-> comn "Comn.Contexts request and trace ids per mount"
+    agento.harness -[ipc]-> comn "Comn.Errors.ErrorStruct"
+    agento.endpoint -[ipc]-> busybody "Busybody.Client heartbeat in dev"
+    agento.harness -[http]-> llm_endpoint "Per-session api_host, default http://localhost:11434/v1"
+}
+
+views {
+    view container_agento of agento {
+        title 'Agento — Containers'
+        description 'The six groupings started by Agento.Application.start/2 and routed by AgentoWeb.Router.'
+        include *
+    }
+}

@@ -1,0 +1,72 @@
+specification {
+    element actor {
+        style {
+            shape browser
+            color muted
+        }
+    }
+    element system
+    element container
+    element component
+    relationship ipc
+    relationship message
+    relationship rpc
+    relationship http
+}
+
+model {
+    browser_user = actor {
+        title 'Browser user'
+        description 'Operates the LiveView UI at /chat, /events, /system and /tools.'
+    }
+
+    harness_client = actor {
+        title 'Harness client'
+        description 'Non-browser consumer of the harness API. Negotiates an agent type through the Accept header on GET /harness, then drives turns with PUT /harness/:session_id.'
+    }
+
+    llmagent = system {
+        title 'LLMAgent'
+        description 'Agent orchestration runtime at ../llmagent, declared as {:LLMAgent, path: "../llmagent"}. Agento holds no domain logic of its own; it starts, prompts and inspects LLMAgent agents, tools and events.'
+        technology 'Elixir OTP application'
+    }
+
+    comn = system {
+        title 'Comn'
+        description 'Shared substrate library. Reaches agento transitively through LLMAgent. Used directly for Comn.Contexts request/trace context and Comn.Errors.ErrorStruct.'
+        technology 'Elixir library'
+    }
+
+    busybody = system {
+        title 'Busybody'
+        description 'Local-dev service directory at ../busybody, a dev-only dependency. Agento registers itself as "agento" with its endpoint when Busybody.Client is loaded.'
+        technology 'Phoenix service registry'
+    }
+
+    llm_endpoint = system {
+        title 'OpenAI-compatible chat endpoint'
+        description 'Reached indirectly: agento configures :LLMAgent model and api_host in config/runtime.exs (default http://localhost:11434/v1, model llama3.2) and harness turns call the LLM client with a per-session endpoint.'
+        technology 'HTTP / JSON'
+    }
+
+    agento = system {
+        title 'Agento'
+        description 'Phoenix LiveView web UI and HTTP harness over LLMAgent. Four LiveViews for chat, events, system inspection and tools, plus a self-describing multi-tenant harness API.'
+        technology 'Phoenix 1.8 / LiveView 1.1 / Bandit'
+    }
+
+    browser_user -[http]-> agento "HTTPS and LiveView websocket"
+    harness_client -[http]-> agento "OPTIONS /, GET /specification, /agents, /toolbox, /harness; PUT /harness/:session_id"
+    agento -[ipc]-> llmagent "Agent lifecycle, tool registry, event bus, durable log, LLM client"
+    agento -[ipc]-> comn "Request and trace contexts, error structs"
+    agento -[ipc]-> busybody "Dev-only self-registration"
+    agento -[http]-> llm_endpoint "Harness turns call chat completions through LLMAgent's client"
+}
+
+views {
+    view context_agento {
+        title 'Agento — System Context'
+        description 'Agento and everything it touches, derived from mix.exs deps, config/runtime.exs and the router.'
+        include *
+    }
+}

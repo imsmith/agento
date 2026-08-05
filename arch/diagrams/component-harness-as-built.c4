@@ -1,0 +1,63 @@
+model {
+    extend agento.harness {
+
+        controller = component {
+            title 'AgentoWeb.HarnessController'
+            description 'HTTP boundary only. Parses and validates, delegates to the Harness modules, maps results to responses. Waits at most 180s for a turn before closing the stream; the turn itself signals done.'
+            technology 'Phoenix Controller'
+        }
+
+        spec = component {
+            title 'AgentoWeb.Harness.Spec'
+            description 'Builds the OpenAPI 3.1 document returned by GET /specification and OPTIONS /. Authored in code rather than checked in as a static file.'
+            technology 'Elixir Module'
+        }
+
+        catalog = component {
+            title 'AgentoWeb.Harness.Catalog'
+            description 'Read-only catalogs: instantiable agent types from LLMAgent.RolePrompt and available tools via AgentoWeb.Discovery.Tools. Rescues UndefinedFunctionError so a missing dep yields an empty catalog rather than a crash.'
+            technology 'Elixir Module'
+        }
+
+        session = component {
+            title 'AgentoWeb.Harness.Session'
+            description 'Negotiates the agent type, opens a session record, reconciles folds. Default TTL 900s; fallback model llama3.2 and fallback api_host http://localhost:11434/v1.'
+            technology 'Elixir Module'
+        }
+
+        registry = component {
+            title 'AgentoWeb.Harness.Registry'
+            description 'The session store. Plain records keyed by an opaque string id holding config, canonical history, current fold and memoized frame sequences for idempotent replay. Lease expires_at renewed per turn; swept every 10s. No per-session process and no session-named atom.'
+            technology 'Elixir GenServer'
+        }
+
+        turn = component {
+            title 'AgentoWeb.Harness.Turn'
+            description 'Runs one turn statelessly in the caller process. Composes the LLM client and tool registry over the session record and streams frames through an emit callback. At most 8 tool rounds; 120s default timeout.'
+            technology 'Elixir Module'
+        }
+
+        controller -[ipc]-> spec "specification action"
+        controller -[ipc]-> catalog "agents and toolbox actions"
+        controller -[ipc]-> session "create action — negotiate and open"
+        controller -[ipc]-> registry "Looks up the session record for interact"
+        controller -[ipc]-> turn "Runs the turn and streams frames"
+        session -[ipc]-> registry "Opens and renews records"
+        session -[ipc]-> catalog "Resolves the negotiated agent type"
+        turn -[ipc]-> registry "Reads and appends the canonical history"
+    }
+
+    harness_client -[http]-> agento.harness.controller "GET /harness, PUT /harness/:session_id"
+    agento.endpoint -[ipc]-> agento.harness.controller ":harness pipeline with put_format :json"
+    agento.harness.catalog -[ipc]-> agento.discovery_facade "Tool list"
+    agento.harness.turn -[ipc]-> llmagent "LLM client and tool dispatch"
+    agento.harness.catalog -[ipc]-> llmagent "LLMAgent.RolePrompt.roles/0"
+}
+
+views {
+    view component_harness of agento.harness {
+        title 'Harness API — Components'
+        description 'The controller and the five Harness modules under lib/agento_web/harness/, showing that sessions are records in a GenServer store and turns are plain function calls.'
+        include *
+    }
+}

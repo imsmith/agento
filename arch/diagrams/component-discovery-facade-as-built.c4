@@ -1,0 +1,53 @@
+model {
+    extend agento.discovery_facade {
+
+        agents = component {
+            title 'AgentoWeb.Discovery.Agents'
+            description 'Wraps LLMAgent.AgentSupervisor. list/0 returns pid, name, role, model, api_host, llm_client, memory and history_length per running agent.'
+            technology 'Elixir Module'
+        }
+
+        tools = component {
+            title 'AgentoWeb.Discovery.Tools'
+            description 'Wraps LLMAgent.Tools.all/0 so the UI never hardcodes which tools exist. Rescues when LLMAgent is absent.'
+            technology 'Elixir Module'
+        }
+
+        endpoints = component {
+            title 'AgentoWeb.Discovery.Endpoints'
+            description 'Reads compute.llm.chat ads from LLMAgent.Tools.Discovery and projects each into a flat option map. Brackets bare IPv6 literals and drops unroutable fe80::/10 link-local addresses. subscribe/1 keeps the dropdown live.'
+            technology 'Elixir Module'
+        }
+
+        events = component {
+            title 'AgentoWeb.Discovery.Events'
+            description 'Agent-backed set of observed event topics and types, seeded with the known agent.* topics and used to populate the Event Explorer filter dropdowns.'
+            technology 'Elixir Agent'
+        }
+
+        behaviours = component {
+            title 'AgentoWeb.Discovery.Behaviours'
+            description 'Scans loaded modules for callback signatures to find LLM client implementations, memory backends, role prompts and Comn behaviour modules — version-adaptive rather than hardcoded.'
+            technology 'Elixir Module'
+        }
+    }
+
+    agento.discovery_facade.agents -[ipc]-> llmagent "AgentSupervisor list and state"
+    agento.discovery_facade.tools -[ipc]-> llmagent "LLMAgent.Tools registry"
+    agento.discovery_facade.endpoints -[ipc]-> llmagent "LLMAgent.Tools.Discovery ads at compute.llm.chat"
+    agento.discovery_facade.behaviours -[ipc]-> llmagent "Module scan for LLMClient and Memory implementations"
+    agento.event_bridge -[ipc]-> agento.discovery_facade.events "Records observed topics; reads them back on each poll"
+    agento.live_ui -[ipc]-> agento.discovery_facade.agents "Agent list"
+    agento.live_ui -[ipc]-> agento.discovery_facade.tools "Tool list"
+    agento.live_ui -[ipc]-> agento.discovery_facade.endpoints "Endpoint dropdown"
+    agento.live_ui -[ipc]-> agento.discovery_facade.events "Filter options"
+    agento.live_ui -[ipc]-> agento.discovery_facade.behaviours "Available LLM clients and memory backends"
+}
+
+views {
+    view component_discovery_facade of agento.discovery_facade {
+        title 'Discovery Facade — Components'
+        description 'The five boundary modules under lib/agento_web/discovery/ that keep the LiveViews from coupling to LLMAgent internals.'
+        include *
+    }
+}

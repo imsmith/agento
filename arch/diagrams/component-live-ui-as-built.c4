@@ -1,0 +1,86 @@
+model {
+    extend agento.live_ui {
+
+        chat_live = component {
+            title 'AgentoWeb.ChatLive'
+            description 'Agent list sidebar plus chat panel. Routes prompts to the selected agent at {:global, name}. The new-agent form endpoint dropdown subscribes to Discovery.Endpoints and refreshes as LAN llama servers appear and expire.'
+            technology 'Phoenix LiveView'
+        }
+
+        events_live = component {
+            title 'AgentoWeb.EventsLive'
+            description 'Event Explorer. Subscribes to the PubSub bridge topic and keeps a rolling stream capped at 200 events, with topic and type filters.'
+            technology 'Phoenix LiveView'
+        }
+
+        system_live = component {
+            title 'AgentoWeb.SystemLive'
+            description 'System inspector with tabs for supervision tree, ETS, Comn contexts, errors, modules and the DurableLog.'
+            technology 'Phoenix LiveView'
+        }
+
+        tools_live = component {
+            title 'AgentoWeb.ToolsLive'
+            description 'Tool inspector listing the registry and invoking tools manually.'
+            technology 'Phoenix LiveView'
+        }
+
+        observability_hook = component {
+            title 'AgentoWeb.Hooks.Observability'
+            description 'on_mount hook for the :default live_session. Mints a request_id and trace_id, sets a Comn.Contexts context, emits web.mount, and attaches a handle_event hook that restores context and emits web.event.'
+            technology 'Phoenix LiveView on_mount hook'
+        }
+
+        core_components = component {
+            title 'AgentoWeb.CoreComponents'
+            description 'Shared HEEx function components used by all four LiveViews.'
+            technology 'Phoenix.Component / HEEx'
+        }
+
+        layouts = component {
+            title 'AgentoWeb.Layouts'
+            description 'Root layout used by the :browser pipeline.'
+            technology 'HEEx'
+        }
+
+        page_controller = component {
+            title 'AgentoWeb.PageController'
+            description 'Serves GET / by redirecting to /chat.'
+            technology 'Phoenix Controller'
+        }
+
+        export_controller = component {
+            title 'AgentoWeb.ExportController'
+            description 'GET /export/:agent. Serves agent events or history as a pretty-printed JSON attachment; the kind query param selects the payload.'
+            technology 'Phoenix Controller'
+        }
+
+        observability_hook -[ipc]-> chat_live "Mounted on"
+        observability_hook -[ipc]-> events_live "Mounted on"
+        observability_hook -[ipc]-> system_live "Mounted on"
+        observability_hook -[ipc]-> tools_live "Mounted on"
+        chat_live -[ipc]-> core_components "Renders"
+        events_live -[ipc]-> core_components "Renders"
+        system_live -[ipc]-> core_components "Renders"
+        tools_live -[ipc]-> core_components "Renders"
+        page_controller -[ipc]-> chat_live "Redirects / to /chat"
+    }
+
+    browser_user -[http]-> agento.live_ui.chat_live "Sends prompts, starts and stops agents"
+    browser_user -[http]-> agento.live_ui.export_controller "Downloads agent JSON"
+
+    agento.live_ui.chat_live -[ipc]-> agento.discovery_facade "Running agents, LLM clients, discovered endpoints"
+    agento.live_ui.events_live -[message]-> agento.event_bridge "Phoenix.PubSub subscription on agento:events"
+    agento.live_ui.system_live -[ipc]-> agento.discovery_facade "Agents and behaviour scans"
+    agento.live_ui.tools_live -[ipc]-> agento.discovery_facade "Tool registry"
+    agento.live_ui.observability_hook -[ipc]-> comn "Comn.Contexts.new/1 and set/1"
+    agento.live_ui.export_controller -[ipc]-> llmagent "EventLog and DurableLog reads"
+}
+
+views {
+    view component_live_ui of agento.live_ui {
+        title 'LiveView UI — Components'
+        description 'The four LiveViews, the observability on_mount hook that wraps them, and the two plain controllers, as routed in AgentoWeb.Router.'
+        include *
+    }
+}

@@ -4,6 +4,46 @@ Running list of friction, footguns, and small fixes surfaced during agento work.
 
 ---
 
+## 2026-08-05 — Model-driven tool dispatch reaches `Tools.Bash` with default config (security)
+
+Surfaced while tracing which policy agento constructs for llmagent's `Tool.Dispatcher`. It constructs none — and the path it does use has no equivalent gate.
+
+### The path
+
+```text
+turn.ex:95  dispatch(tool, action, args, allowed)
+            -> allowed?/2                     # :all -> true
+            -> LLMAgent.Tools.get(tool)       # legacy persistent_term registry
+            -> mod.perform(action, args)
+```
+
+`allowed_tools` comes from `Application.get_env(:agento, :harness_allowed_tools, :all)` (`lib/agento_web/harness/session.ex:42`). **No config file sets that key**, so the runtime default is `:all`, and `allowed?(_tool, :all)` returns `true` for every registered tool.
+
+`LLMAgent.Tools.Bash` is one of the twelve builtins in that registry:
+
+```elixir
+def perform("exec", %{"command" => cmd}) when is_binary(cmd) do
+  {output, exit_code} = System.cmd("bash", ["-c", cmd], stderr_to_stdout: true)
+```
+
+Model-supplied string straight to `bash -c`. No validation, no denylist, no timeout — the whole module was checked.
+
+### Why it matters
+
+This is the model-driven path, distinct from the manual `/tools` form already recorded as **R6.3** below. R6.3 is a human clicking a debug form; this is the agent's own tool loop during a turn, and it is on by default.
+
+For contrast, llmagent's new `:exec` binding adapter — built the same day to run *statically analysed* local commands — executes argv-only with no shell, refuses `:system`/`:unknown` blast radius and incomplete extraction, enforces a 30s total timeout, and sits behind `Tool.Policy`, which denies everything by default. It currently has no production caller at all. The hardened path is unreachable; the unhardened one is the default.
+
+### What should change
+
+Same root cause and same eventual fix as R6.3 — real users, authentication, authorization — but this path should not wait on that, because it is reachable without a human in the loop:
+
+- Set `:harness_allowed_tools` explicitly in config rather than relying on the `:all` fallback, and omit `:bash` from it.
+- Or route the harness through `LLMAgent.Tool.Dispatcher` with a `%Policy{}`, which brings the allow-list, `fidelity_min`, and `require_approval` machinery that already exists and is currently unused anywhere in production.
+- Longer term this belongs to the system, not the harness: an agent executing a command should be a system principal whose permissions the kernel enforces, so a bypass at any application layer still lands on a uid that cannot do the damage.
+
+---
+
 ## 2026-07-14 — PRD compliance audit (PRD-PHOENIX-UI.md)
 
 Audited the codebase against PRD-PHOENIX-UI.md: **28 of 39 requirements MET, 11 PARTIAL, 0 fully MISSING.** Every requirement group is functional end-to-end; the partials below are refinements plus one deliberate deviation. Priority order top to bottom.

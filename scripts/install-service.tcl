@@ -16,11 +16,13 @@
 #   .local/lib/agento/                     the release
 #   .local/share/agento/                   data: turn log, durable event log
 #   .config/agento/hub.edn                 clients and routing      (mode 0600)
+#   .config/agento/rules/hub-routing.rule  the routing, as rules you edit
 #   .config/agento/env                     the unit's environment   (mode 0600)
 #   .config/systemd/user/agento.service    the unit
 #
-# hub.edn and env hold secrets and are written only if absent: running this
-# again rebuilds the release and the unit and leaves both alone.
+# hub.edn and env hold secrets, and the rule file is yours once written: all
+# three are written only if absent. Running this again rebuilds the release
+# and the unit and leaves them alone.
 #
 # It does not call systemctl. It prints the commands to enable the unit and
 # how to point Claude Code at the hub.
@@ -155,6 +157,8 @@ proc main {argv} {
     set release_dir [file join $prefix .local lib agento]
     set data_dir    [file join $prefix .local share agento]
     set hub_edn     [file join $config_dir hub.edn]
+    set rules_dir   [file join $config_dir rules]
+    set routing     [file join $rules_dir hub-routing.rule]
     set env_path    [file join $config_dir env]
     set unit_path   [file join $unit_dir agento.service]
 
@@ -162,7 +166,7 @@ proc main {argv} {
         puts "dry run; nothing will be written. Would:"
         puts "  build the release into $release_dir"
         puts "  create $data_dir"
-        foreach path [list $hub_edn $env_path] {
+        foreach path [list $hub_edn $env_path $routing] {
             puts "  [expr {[file exists $path] ? "keep" : "write"}] $path"
         }
         puts "  write $unit_path"
@@ -172,7 +176,7 @@ proc main {argv} {
     puts "building the release"
     build $repo $release_dir
 
-    file mkdir $config_dir $unit_dir $data_dir
+    file mkdir $config_dir $unit_dir $data_dir $rules_dir
     file attributes $config_dir -permissions 0700
     file attributes $data_dir -permissions 0700
 
@@ -190,6 +194,15 @@ proc main {argv} {
         set secret [string map {"\n" ""} [binary encode base64 [random_bytes 48]]]
         write_secret $env_path [env_file $secret [dict get $opts name] $port $hub_edn]
         puts "wrote $env_path"
+    }
+
+    # The hub's routing, as a rule file the owner edits. Never overwritten:
+    # it is theirs once written.
+    if {[file exists $routing]} {
+        puts "keeping $routing"
+    } else {
+        file copy [file join $repo priv rules hub-routing.rule] $routing
+        puts "wrote $routing"
     }
 
     set fh [open [file join $repo rel agento.service.in] r]

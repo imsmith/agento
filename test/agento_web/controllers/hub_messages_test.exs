@@ -221,6 +221,25 @@ defmodule AgentoWeb.HubMessagesTest do
       assert {"authentication_error", _} = error_body(conn, 401)
     end
 
+    test "a rule that refuses the turn is a 403 saying why, and the performer is not contacted",
+         ctx do
+      never_contacted(ctx.bypass)
+
+      :ok =
+        Agento.Rules.load("refusing-test.rule", """
+        rule no { context "hub" { when HUB_ROUTE { [HUB::refuse :because "closed for the night"] } } }
+        """)
+
+      on_exit(fn -> Agento.Rules.unload("refusing-test.rule") end)
+
+      assert {"permission_error", message} =
+               ctx.conn
+               |> post("/v1/messages", fixture("claude_code_request.json"))
+               |> error_body(403)
+
+      assert message =~ "closed for the night"
+    end
+
     test "with no performer the answer is a 404 naming the model", ctx do
       reset_registry()
       never_contacted(ctx.bypass)

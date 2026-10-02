@@ -72,11 +72,11 @@ test unit-has-no-template-markers {the unit file names the prefix's paths and no
          [expr {[string first "WorkingDirectory=$prefix/.local/share/agento" $unit] >= 0}]
 } -result {0 1 1 1}
 
-test env-file-binds-loopback {the env file binds loopback and points at this prefix's config} -body {
+test env-file-binds-every-interface {the env file binds every interface and points at this prefix's config} -body {
     set prefix [fresh_prefix]
     install $prefix --default-host big.local --port 4999
     set envtext [slurp [dict get [paths $prefix] env]]
-    list [regexp -line {^AGENTO_BIND=127\.0\.0\.1$} $envtext] \
+    list [regexp -line {^AGENTO_BIND=0\.0\.0\.0$} $envtext] \
          [regexp -line {^PORT=4999$} $envtext] \
          [regexp -line {^PHX_SERVER=true$} $envtext] \
          [regexp -line {^SECRET_KEY_BASE=\S{64,}$} $envtext] \

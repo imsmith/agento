@@ -89,9 +89,13 @@ proc env_file {secret port hub_edn} {
     append env "PHX_SERVER=true\n"
     append env "PHX_HOST=localhost\n"
     append env "PORT=$port\n"
-    append env "AGENTO_BIND=127.0.0.1\n"
+    # Every interface, plain HTTP: the hub is for this network, not just this
+    # machine. Change to 127.0.0.1 to keep it local.
+    append env "AGENTO_BIND=0.0.0.0\n"
     # A release also listens for Erlang distribution (bin/agento rpc, stop).
-    # Keep that, and the port mapper, on loopback as well. The node is named
+    # That, and the port mapper, stay on loopback whatever the HTTP listener
+    # binds: the cookie that guards them is all that stands between a peer
+    # and running code here. The node is named
     # at 127.0.0.1 so that rpc and stop look for it where it listens; a short
     # name would resolve to the machine's LAN address. The name is distinct
     # per port, so a second copy on the same machine does not collide.
@@ -202,6 +206,7 @@ proc main {argv} {
     puts "To point Claude Code at it:"
     puts "  export ANTHROPIC_BASE_URL=http://127.0.0.1:$kept_port"
     puts "  export ANTHROPIC_AUTH_TOKEN=$token"
+    puts "From another machine, use this host's address in place of 127.0.0.1."
     if {![regexp {:default-host} $edn]} {
         puts ""
         puts "No :default-host is set in $hub_edn. Requests for a model no host"

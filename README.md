@@ -127,6 +127,9 @@ export ANTHROPIC_AUTH_TOKEN=<the token in ~/.config/agento/hub.edn>
 claude
 ```
 
+From another machine on the network, use this host's address in place of
+`127.0.0.1`.
+
 With those set, Claude Code talks only to the hub. That session does not use
 a Claude subscription, and this build of the hub never forwards to a paid
 API: every client's policy admits local mDNS-discovered performers and
@@ -165,6 +168,19 @@ entries to `:clients` in `hub.edn` and restart the unit.
 - **Model quality is the model's.** The hub carries tool calls faithfully. A
   small local model may still handle Claude Code's tool set poorly.
 
+### On the network
+
+The service listens on every interface over plain HTTP. Two things follow,
+and both are deliberate:
+
+- Tokens and prompts cross the network unencrypted.
+- Only the hub's `/v1` routes ask for a token. The rest of agento — the
+  harness API and the Chat, Events, System and Tools views — is on the same
+  listener and open to anything that can reach it, including tools that act
+  on this host.
+
+Erlang distribution and the port mapper stay on loopback regardless.
+
 ### Where things are
 
 | What | Where |
@@ -184,7 +200,7 @@ without either body.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `AGENTO_BIND` | `127.0.0.1` | Address the listener binds. Loopback unless you decide otherwise. |
+| `AGENTO_BIND` | `0.0.0.0` | Address the listener binds. Every interface, plain HTTP; set `127.0.0.1` to keep it local. |
 | `AGENTO_HUB_CONFIG` | `~/.config/agento/hub.edn` | Hub configuration file. |
 | `PORT` | `4141` in a release | HTTP listen port. |
 

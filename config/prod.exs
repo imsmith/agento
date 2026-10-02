@@ -8,15 +8,9 @@ import Config
 config :agento, AgentoWeb.Endpoint,
   cache_static_manifest: "priv/static/cache_manifest.json"
 
-# Force using SSL in production. This also sets the "strict-security-transport" header,
-# known as HSTS. If you have a health check endpoint, you may want to exclude it below.
-# Note `:force_ssl` is required to be set at compile-time.
-config :agento, AgentoWeb.Endpoint,
-  force_ssl: [rewrite_on: [:x_forwarded_proto]],
-  exclude: [
-    # paths: ["/health"],
-    hosts: ["localhost", "127.0.0.1"]
-  ]
+# Agento serves plain HTTP on the local network. There is no `force_ssl`
+# here: nothing serves HTTPS, so a redirect to it would only break every
+# request that did not come from localhost.
 
 # Do not print debug messages in production
 config :logger, level: :info

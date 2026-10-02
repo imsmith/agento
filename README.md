@@ -102,12 +102,18 @@ Claude Code --Messages/SSE--> agento /v1/messages
 tclsh scripts/install-service.tcl --default-host skynet001.local
 ```
 
+The hub has no fixed address. Each time it starts it takes a free port and
+registers with [busybody](../busybody) as `agento`; clients ask busybody
+where it is. Busybody must be running (`http://localhost:5150`, or
+`BUSYBODY_URL`).
+
 This builds a release under `~/.local/lib/agento`, and writes
 `~/.config/agento/hub.edn` (clients and routing), `~/.config/agento/env`
 (the unit's environment) and `~/.config/systemd/user/agento.service`. The
 two files under `~/.config/agento` hold secrets, are mode 0600, and are never
 overwritten by a later run. `--prefix DIR` installs under another root,
-`--port N` picks the port (default 4141), `--dry-run` shows what it would do.
+`--name NAME` registers under another name, `--port N` pins a port for
+something that cannot look one up, `--dry-run` shows what it would do.
 
 It does not start anything. To run the hub now and at every login:
 
@@ -119,16 +125,22 @@ systemctl --user status agento
 
 ### Point a client at it
 
-The installer prints both lines with the generated token:
+`scripts/hub-url.tcl` asks busybody where the hub is and prints its URL. The
+installer prints both lines with the generated token:
 
 ```bash
-export ANTHROPIC_BASE_URL=http://127.0.0.1:4141
+export ANTHROPIC_BASE_URL=$(tclsh scripts/hub-url.tcl)
 export ANTHROPIC_AUTH_TOKEN=<the token in ~/.config/agento/hub.edn>
 claude
 ```
 
-From another machine on the network, use this host's address in place of
-`127.0.0.1`.
+The URL is resolved when the client starts. If the hub restarts it comes up
+on a different port, and a client started before that needs restarting too.
+After the hub stops, busybody keeps its entry until its next health check,
+up to half a minute.
+
+From another machine, point the script at this host's busybody:
+`tclsh scripts/hub-url.tcl --registry-url http://<this host>:5150`.
 
 With those set, Claude Code talks only to the hub. That session does not use
 a Claude subscription, and this build of the hub never forwards to a paid
@@ -143,7 +155,7 @@ entries to `:clients` in `hub.edn` and restart the unit.
 `~/.pi/agent/models.json`. This has not been tested:
 
 ```text
-{"providers": {"agento": {"baseUrl": "http://127.0.0.1:4141",
+{"providers": {"agento": {"baseUrl": "<output of scripts/hub-url.tcl>",
                           "api": "anthropic-messages",
                           "apiKey": "<a client token from hub.edn>",
                           "models": [{"id": "local"}]}}}
@@ -186,7 +198,8 @@ Erlang distribution and the port mapper stay on loopback regardless.
 | What | Where |
 | --- | --- |
 | Clients, default host, retention | `~/.config/agento/hub.edn` |
-| Port, bind address, secrets | `~/.config/agento/env` |
+| Bind address, busybody name, secrets | `~/.config/agento/env` |
+| Where the hub is right now | `tclsh scripts/hub-url.tcl`, or busybody's directory page |
 | Turn log (SQLite) | `~/.local/share/agento/hub_turns.sqlite` |
 | Service log | `journalctl --user -u agento` |
 | Live traffic | the Events view, topic `hub.request` |
@@ -202,7 +215,9 @@ without either body.
 | --- | --- | --- |
 | `AGENTO_BIND` | `0.0.0.0` | Address the listener binds. Every interface, plain HTTP; set `127.0.0.1` to keep it local. |
 | `AGENTO_HUB_CONFIG` | `~/.config/agento/hub.edn` | Hub configuration file. |
-| `PORT` | `4141` in a release | HTTP listen port. |
+| `PORT` | `0` (a free port) | HTTP listen port. Leave it unset; busybody knows where the hub is. |
+| `AGENTO_BUSYBODY_NAME` | `agento` | Name the hub registers under. |
+| `BUSYBODY_URL` | `http://localhost:5150` | Where busybody is. |
 
 A hub configuration that cannot be trusted stops agento at boot with a
 message saying why: a file readable by anyone but its owner, malformed edn,
@@ -234,8 +249,9 @@ covered by registering fake `compute.llm.chat` ads as the discovery source.
 The hub is tested against a fake performer serving streams recorded from the
 live llama-servers, with request bodies captured from a real Claude Code
 client (both live in llmagent's `test/fixtures/wire/`). The install script
-has its own suite:
+and the resolver have their own suites:
 
 ```bash
 tclsh test/tcl/install_service_test.tcl
+tclsh test/tcl/hub_url_test.tcl
 ```

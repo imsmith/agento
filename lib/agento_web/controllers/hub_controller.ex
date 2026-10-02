@@ -36,8 +36,13 @@ defmodule AgentoWeb.HubController do
     end
   end
 
-  # Every turn that reached routing is recorded, however it ended.
-  defp record(summary), do: TurnLog.record(summary)
+  # Every turn that reached routing is recorded, however it ended: in full in
+  # the turn log, and as a `hub.request` event without either body. What the
+  # client and the performer said goes to the turn log and nowhere else.
+  defp record(summary) do
+    TurnLog.record(summary)
+    LLMAgent.Events.emit(:request, "hub.request", Map.drop(summary, [:request_body, :response_body]), __MODULE__)
+  end
 
   defp error(conn, status, message) do
     conn |> put_status(status) |> json(Anthropic.encode_error(status, message))

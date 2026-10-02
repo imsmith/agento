@@ -286,6 +286,65 @@ defmodule AgentoWeb.HubMessagesTest do
     end
   end
 
+  describe "hub.request events" do
+    setup do
+      LLMAgent.EventBus.subscribe("hub.request")
+      :ok
+    end
+
+    test "a successful turn emits one event with the turn's facts and neither body", ctx do
+      serve(ctx.bypass, "openai_text_stream.sse")
+      body = fixture("claude_code_request.json")
+      post(ctx.conn, "/v1/messages", body)
+
+      assert_receive {:event, "hub.request", event}, 1_000
+      refute_receive {:event, "hub.request", _}, 100
+
+      assert event.type == :request
+      data = event.data
+
+      assert %{
+               client: "test-client",
+               wire: "anthropic",
+               outcome: "ok",
+               stop_reason: "end_turn"
+             } = data
+
+      assert data.requested_model == Jason.decode!(body)["model"]
+      assert data.ad_id == ctx.ad.id
+      assert is_binary(data.performer_model)
+      assert is_integer(data.input_tokens) and is_integer(data.output_tokens) and is_integer(data.duration_ms)
+
+      refute Map.has_key?(data, :request_body)
+      refute Map.has_key?(data, :response_body)
+
+      # Nothing the client or the performer said is anywhere in the event.
+      rendered = inspect(event, limit: :infinity, printable_limit: :infinity)
+      refute rendered =~ "hello there"
+      refute rendered =~ "scrubbed"
+    end
+
+    test "a failed turn emits one event carrying the error", ctx do
+      Bypass.down(ctx.bypass)
+      post(ctx.conn, "/v1/messages", fixture("claude_code_request.json"))
+
+      assert_receive {:event, "hub.request", %{data: %{outcome: "error", error: error}}}, 1_000
+      assert is_binary(error)
+      refute_receive {:event, "hub.request", _}, 100
+    end
+
+    test "a turn with no performer emits an event too", ctx do
+      reset_registry()
+      post(ctx.conn, "/v1/messages", fixture("claude_code_request.json"))
+
+      assert_receive {:event, "hub.request", %{data: %{outcome: "error", ad_id: nil}}}, 1_000
+    end
+
+    test "the web bridge carries hub.request to the Events view" do
+      assert "hub.request" in Agento.EventBusBridge.discover_topics()
+    end
+  end
+
   describe "Turn.run/5" do
     defp turn(name \\ "claude_code_request.json") do
       {:ok, turn} = name |> fixture() |> Jason.decode!() |> Anthropic.decode_request()

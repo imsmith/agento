@@ -31,3 +31,7 @@ config :LLMAgent,
 # LLMAgent.init reads :llm_client from start opts, not app config, so
 # AgentoWeb.Harness.Session.open/1 threads this through explicitly.
 config :agento, harness_llm_client: AgentoWeb.TestLLMClient
+
+# The hub reads its clients from an edn file. Tests install their own config
+# with Agento.Hub.Config.put/1; at boot there is deliberately no file.
+config :agento, hub_config_path: "/nonexistent/agento-test-hub.edn"

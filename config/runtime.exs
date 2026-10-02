@@ -33,7 +33,10 @@ config :LLMAgent,
 # configure the adapter itself, and resolve the shim from LLMAgent's priv
 # dir via app_dir/2 rather than File.cwd!() (which would point at agento's
 # nonexistent priv/discovery path).
-if tclsh = System.find_executable("tclsh") do
+#
+# Not in tests: the shim renews its ads for as long as it runs, so a test
+# that empties the registry would see the real network's hosts reappear.
+if tclsh = config_env() != :test && System.find_executable("tclsh") do
   config :LLMAgent, :discovery_adapters, [
     %{
       name: :avahi_llama,

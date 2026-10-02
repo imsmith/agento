@@ -38,10 +38,15 @@ defmodule AgentoWeb.Endpoint do
   plug Plug.RequestId
   plug Plug.Telemetry, event_prefix: [:phoenix, :endpoint]
 
+  # The body reader keeps the raw bytes of hub (/v1/) requests for the turn
+  # log. The length limit is raised from the 8 MB default because a coding
+  # client's request can carry images.
   plug Plug.Parsers,
     parsers: [:urlencoded, :multipart, :json],
     pass: ["*/*"],
-    json_decoder: Phoenix.json_library()
+    json_decoder: Phoenix.json_library(),
+    body_reader: {AgentoWeb.Hub.RawBody, :read_body, []},
+    length: 64_000_000
 
   plug Plug.MethodOverride
   plug Plug.Head

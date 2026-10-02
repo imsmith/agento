@@ -21,6 +21,18 @@ defmodule AgentoWeb.Router do
     plug :put_format, :json
   end
 
+  # The private LLM hub: vendor wire protocols, identified by bearer token.
+  pipeline :hub do
+    plug :put_format, :json
+    plug AgentoWeb.Hub.Auth
+  end
+
+  scope "/v1", AgentoWeb do
+    pipe_through :hub
+
+    get "/models", HubController, :models
+  end
+
   scope "/", AgentoWeb do
     pipe_through :harness
 

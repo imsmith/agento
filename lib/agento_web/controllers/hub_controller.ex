@@ -6,7 +6,35 @@ defmodule AgentoWeb.HubController do
   """
   use AgentoWeb, :controller
 
+  alias Agento.Hub.Config
   alias Agento.Hub.Router
+  alias AgentoWeb.Hub.Turn
+  alias LLMAgent.Codec.Anthropic
+
+  @doc """
+  One turn in Anthropic's Messages format: decode it, pick a performer, run
+  it. Streams when the request asks for a stream.
+  """
+  def messages(conn, _params) do
+    client = conn.assigns.hub_client
+    config = Config.get()
+
+    with {:ok, turn} <- Anthropic.decode_request(conn.body_params),
+         {:route, turn, {:ok, ad}} <- {:route, turn, Router.route(turn.model, client, config)} do
+      {conn, _summary} = Turn.run(conn, turn, ad, client, config)
+      conn
+    else
+      {:error, {_kind, what}} ->
+        error(conn, 400, what)
+
+      {:route, turn, {:error, :no_performer}} ->
+        error(conn, 404, "no performer is available for model #{inspect(turn.model)}")
+    end
+  end
+
+  defp error(conn, status, message) do
+    conn |> put_status(status) |> json(Anthropic.encode_error(status, message))
+  end
 
   @doc """
   The models the calling client can reach right now — whatever the admitted

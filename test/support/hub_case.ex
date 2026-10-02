@@ -78,6 +78,62 @@ defmodule AgentoWeb.HubCase do
     })
   end
 
+  @wire_fixtures Path.expand("../../../llmagent/test/fixtures/wire", __DIR__)
+
+  @doc """
+  Raw bytes of a fixture recorded in llmagent's `test/fixtures/wire/`: streams
+  from the live llama-servers and requests captured from a real Claude Code.
+  """
+  @spec fixture(String.t()) :: binary()
+  def fixture(name), do: File.read!(Path.join(@wire_fixtures, name))
+
+  @doc "Split an SSE body into `{event, decoded_json}` pairs."
+  @spec sse_frames(binary()) :: [{String.t(), map()}]
+  def sse_frames(body) do
+    {frames, _state} = LLMAgent.Codec.SSE.feed(LLMAgent.Codec.SSE.new(), body)
+    Enum.map(frames, &{&1.event, Jason.decode!(&1.data)})
+  end
+
+  @doc """
+  A performer on a bare socket, for the cases Bypass cannot play: it accepts
+  one request, optionally sends `head` as the start of a chunked event
+  stream, then never finishes. The task's result is how its connection
+  ended (`:closed` when the caller hung up).
+  """
+  @spec stalling_performer(binary() | nil) :: {String.t(), Task.t()}
+  def stalling_performer(head \\ nil) do
+    {:ok, listen} = :gen_tcp.listen(0, [:binary, active: false, reuseaddr: true])
+    {:ok, port} = :inet.port(listen)
+
+    task =
+      Task.async(fn ->
+        {:ok, socket} = :gen_tcp.accept(listen, 5_000)
+        {:ok, _request} = :gen_tcp.recv(socket, 0, 5_000)
+
+        if head do
+          :ok =
+            :gen_tcp.send(socket, [
+              "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\ntransfer-encoding: chunked\r\n\r\n",
+              Integer.to_string(byte_size(head), 16),
+              "\r\n",
+              head,
+              "\r\n"
+            ])
+        end
+
+        drain(socket)
+      end)
+
+    {"http://localhost:#{port}", task}
+  end
+
+  defp drain(socket) do
+    case :gen_tcp.recv(socket, 0, 4_000) do
+      {:ok, _more} -> drain(socket)
+      {:error, reason} -> reason
+    end
+  end
+
   @doc "Register an ad built by `llama_ad/1`."
   @spec register(keyword()) :: ToolAd.t()
   def register(opts \\ []) do

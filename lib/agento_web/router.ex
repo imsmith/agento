@@ -31,6 +31,7 @@ defmodule AgentoWeb.Router do
     pipe_through :hub
 
     get "/models", HubController, :models
+    post "/messages", HubController, :messages
   end
 
   scope "/", AgentoWeb do

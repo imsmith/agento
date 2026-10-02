@@ -52,15 +52,11 @@ defmodule Agento.Hub.Router do
   # Sorted so that the choice between two hosts serving the same model does
   # not depend on registry order.
   defp candidates(client) do
-    case Discovery.find_all(ToolQuery.new(%{coordinate: @coordinate})) do
-      {:ok, ads} ->
-        ads
-        |> Enum.filter(&(Policy.decide(client.policy, &1, :generate, "chat") == :ok))
-        |> Enum.sort_by(& &1.id)
+    {:ok, ads} = Discovery.find_all(ToolQuery.new(%{coordinate: @coordinate}))
 
-      _ ->
-        []
-    end
+    ads
+    |> Enum.filter(&(Policy.decide(client.policy, &1, :generate, "chat") == :ok))
+    |> Enum.sort_by(& &1.id)
   end
 
   defp model(%ToolAd{binding: {_kind, %{model: model}}}), do: model

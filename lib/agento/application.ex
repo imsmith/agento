@@ -46,10 +46,21 @@ defmodule Agento.Application do
 
   defp busybody_children do
     if Code.ensure_loaded?(Busybody.Client) do
-      [{Busybody.Client, name: "agento", endpoint: AgentoWeb.Endpoint}]
+      [{Busybody.Client, busybody_options()}]
     else
       []
     end
+  end
+
+  # Agento has no fixed address: the endpoint takes a free port and busybody
+  # is told where it ended up. AGENTO_BUSYBODY_NAME is the name it registers
+  # under; BUSYBODY_URL is where busybody is, when not on this machine.
+  defp busybody_options do
+    [name: System.get_env("AGENTO_BUSYBODY_NAME", "agento"), endpoint: AgentoWeb.Endpoint] ++
+      case System.get_env("BUSYBODY_URL") do
+        nil -> []
+        url -> [registry_url: url]
+      end
   end
 
   # Tell Phoenix to update the endpoint configuration

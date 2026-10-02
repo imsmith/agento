@@ -61,10 +61,10 @@ bind =
       raise "AGENTO_BIND must be an IP address, got #{inspect(System.get_env("AGENTO_BIND"))}"
   end
 
-default_port = if config_env() == :prod, do: "4141", else: "0"
-
+# Port 0 unless PORT pins one: the OS picks a free port and busybody is told
+# which. Clients find agento by name, not by a number someone has to remember.
 config :agento, AgentoWeb.Endpoint,
-  http: [ip: bind, port: String.to_integer(System.get_env("PORT", default_port))]
+  http: [ip: bind, port: String.to_integer(System.get_env("PORT", "0"))]
 
 if config_env() == :prod do
   # The secret key base is used to sign/encrypt cookies and other secrets.
@@ -87,8 +87,10 @@ if config_env() == :prod do
   config :agento, AgentoWeb.Endpoint,
     # Plain HTTP, reached by whatever name or address a client uses. The
     # LiveView socket accepts an origin that matches the host the request
-    # itself was made to, rather than one fixed name.
-    url: [host: host, port: String.to_integer(System.get_env("PORT", default_port)), scheme: "http"],
+    # itself was made to, rather than one fixed name. No port here: the real
+    # one is whatever was bound, and busybody's client reads a port set here
+    # in preference to it.
+    url: [host: host, scheme: "http"],
     check_origin: :conn,
     secret_key_base: secret_key_base
 

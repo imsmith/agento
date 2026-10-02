@@ -4,7 +4,12 @@
 # user unit needs to run it as the private LLM hub.
 #
 #   tclsh scripts/install-service.tcl ?--prefix DIR? ?--default-host NAME?
-#                                     ?--port N? ?--dry-run?
+#                                     ?--name NAME? ?--port N? ?--dry-run?
+#
+# The hub has no fixed address. It takes a free port each time it starts and
+# registers with busybody under NAME (default "agento"); clients ask busybody
+# where it is (scripts/hub-url.tcl). --port pins a port for the rare case
+# that something cannot look it up.
 #
 # Under PREFIX (default: your home directory) it writes:
 #
@@ -18,7 +23,7 @@
 # again rebuilds the release and the unit and leaves both alone.
 #
 # It does not call systemctl. It prints the commands to enable the unit and
-# the two variables to set for Claude Code.
+# how to point Claude Code at the hub.
 #
 # AGENTO_INSTALL_BUILD_CMD replaces the release build with another command;
 # the tests use it so they do not build a release.
@@ -31,20 +36,24 @@ proc fail {message} {
 }
 
 proc parse_args {argv} {
-    set opts [dict create prefix $::env(HOME) default_host "" port 4141 dry_run 0]
+    set opts [dict create prefix $::env(HOME) default_host "" name agento port "" dry_run 0]
     for {set i 0} {$i < [llength $argv]} {incr i} {
         set arg [lindex $argv $i]
         switch -- $arg {
             --prefix       { dict set opts prefix [file normalize [lindex $argv [incr i]]] }
             --default-host { dict set opts default_host [lindex $argv [incr i]] }
+            --name         { dict set opts name [lindex $argv [incr i]] }
             --port         { dict set opts port [lindex $argv [incr i]] }
             --dry-run      { dict set opts dry_run 1 }
             default        { fail "unknown option $arg" }
         }
     }
     set port [dict get $opts port]
-    if {![string is integer -strict $port] || $port < 1 || $port > 65535} {
+    if {$port ne "" && (![string is integer -strict $port] || $port < 1 || $port > 65535)} {
         fail "--port must be a number between 1 and 65535, got \"$port\""
+    }
+    if {![regexp {^[A-Za-z0-9_-]+$} [dict get $opts name]]} {
+        fail "--name must be letters, digits, - and _"
     }
     if {![regexp {^[A-Za-z0-9._-]*$} [dict get $opts default_host]]} {
         fail "--default-host must be a hostname"
@@ -84,11 +93,16 @@ proc hub_edn {token default_host data_dir} {
     return $edn
 }
 
-proc env_file {secret port hub_edn} {
+proc env_file {secret name port hub_edn} {
     set env "SECRET_KEY_BASE=$secret\n"
     append env "PHX_SERVER=true\n"
     append env "PHX_HOST=localhost\n"
-    append env "PORT=$port\n"
+    # No PORT unless one was asked for: the hub takes a free port and tells
+    # busybody, under this name, where it ended up.
+    if {$port ne ""} {
+        append env "PORT=$port\n"
+    }
+    append env "AGENTO_BUSYBODY_NAME=$name\n"
     # Every interface, plain HTTP: the hub is for this network, not just this
     # machine. Change to 127.0.0.1 to keep it local.
     append env "AGENTO_BIND=0.0.0.0\n"
@@ -97,12 +111,11 @@ proc env_file {secret port hub_edn} {
     # binds: the cookie that guards them is all that stands between a peer
     # and running code here. The node is named
     # at 127.0.0.1 so that rpc and stop look for it where it listens; a short
-    # name would resolve to the machine's LAN address. The name is distinct
-    # per port, so a second copy on the same machine does not collide.
+    # name would resolve to the machine's LAN address.
     append env "ERL_EPMD_ADDRESS=127.0.0.1\n"
     append env "ERL_AFLAGS=\"-kernel inet_dist_use_interface {127,0,0,1}\"\n"
     append env "RELEASE_DISTRIBUTION=name\n"
-    append env "RELEASE_NODE=agento_$port@127.0.0.1\n"
+    append env "RELEASE_NODE=$name@127.0.0.1\n"
     append env "AGENTO_HUB_CONFIG=$hub_edn\n"
     return $env
 }
@@ -175,7 +188,7 @@ proc main {argv} {
         puts "keeping $env_path"
     } else {
         set secret [string map {"\n" ""} [binary encode base64 [random_bytes 48]]]
-        write_secret $env_path [env_file $secret $port $hub_edn]
+        write_secret $env_path [env_file $secret [dict get $opts name] $port $hub_edn]
         puts "wrote $env_path"
     }
 
@@ -192,10 +205,13 @@ proc main {argv} {
     close $fh
     set token "<the :token of the client in $hub_edn>"
     regexp {:token "([^"]+)"} $edn -> token
-    set kept_port $port
     set fh [open $env_path r]
-    regexp -line {^PORT=(\d+)$} [read $fh] -> kept_port
+    set kept_env [read $fh]
     close $fh
+    set kept_name agento
+    regexp -line {^AGENTO_BUSYBODY_NAME=(.+)$} $kept_env -> kept_name
+    set resolver "tclsh [file join $repo scripts hub-url.tcl]"
+    if {$kept_name ne "agento"} { append resolver " --name $kept_name" }
 
     puts ""
     puts "To run the hub now and at every login:"
@@ -203,10 +219,10 @@ proc main {argv} {
     puts "  systemctl --user enable --now agento"
     puts "  systemctl --user status agento"
     puts ""
-    puts "To point Claude Code at it:"
-    puts "  export ANTHROPIC_BASE_URL=http://127.0.0.1:$kept_port"
+    puts "The hub takes a free port each start and registers with busybody as"
+    puts "\"$kept_name\". To point Claude Code at wherever it is now:"
+    puts "  export ANTHROPIC_BASE_URL=\$($resolver)"
     puts "  export ANTHROPIC_AUTH_TOKEN=$token"
-    puts "From another machine, use this host's address in place of 127.0.0.1."
     if {![regexp {:default-host} $edn]} {
         puts ""
         puts "No :default-host is set in $hub_edn. Requests for a model no host"

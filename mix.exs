@@ -67,7 +67,8 @@ defmodule Agento.MixProject do
       {:ex_edn, path: "../ex_edn"},
       {:exqlite, "~> 0.27"},
       {:bypass, "~> 2.1", only: :test},
-      {:busybody, path: "../busybody", only: :dev}
+      # Not in test: a test run must not announce itself in the directory.
+      {:busybody, path: "../busybody", only: [:dev, :prod]}
     ]
   end
 

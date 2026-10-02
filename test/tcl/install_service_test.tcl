@@ -72,6 +72,21 @@ test unit-has-no-template-markers {the unit file names the prefix's paths and no
          [expr {[string first "WorkingDirectory=$prefix/.local/share/agento" $unit] >= 0}]
 } -result {0 1 1 1}
 
+test no-port-by-default {with no --port the env file pins no port, so the hub takes a free one} -body {
+    set prefix [fresh_prefix]
+    install $prefix --default-host big.local
+    set envtext [slurp [dict get [paths $prefix] env]]
+    list [regexp -line {^PORT=} $envtext] [regexp -line {^AGENTO_BUSYBODY_NAME=agento$} $envtext]
+} -result {0 1}
+
+test name-option {--name sets both the busybody name and the node name} -body {
+    set prefix [fresh_prefix]
+    install $prefix --default-host big.local --name hub-two
+    set envtext [slurp [dict get [paths $prefix] env]]
+    list [regexp -line {^AGENTO_BUSYBODY_NAME=hub-two$} $envtext] \
+         [regexp -line {^RELEASE_NODE=hub-two@127\.0\.0\.1$} $envtext]
+} -result {1 1}
+
 test env-file-binds-every-interface {the env file binds every interface and points at this prefix's config} -body {
     set prefix [fresh_prefix]
     install $prefix --default-host big.local --port 4999
@@ -90,7 +105,7 @@ test env-file-keeps-distribution-on-loopback {Erlang distribution and epmd are b
     list [regexp -line {^ERL_EPMD_ADDRESS=127\.0\.0\.1$} $envtext] \
          [regexp -line {^ERL_AFLAGS="-kernel inet_dist_use_interface \{127,0,0,1\}"$} $envtext] \
          [regexp -line {^RELEASE_DISTRIBUTION=name$} $envtext] \
-         [regexp -line {^RELEASE_NODE=agento_4141@127\.0\.0\.1$} $envtext]
+         [regexp -line {^RELEASE_NODE=agento@127\.0\.0\.1$} $envtext]
 } -result {1 1 1 1}
 
 test config-names-host-and-client {the config has one client with a long token and the default host} -body {
@@ -106,7 +121,7 @@ test prints-the-token-and-next-steps {the output tells the operator what to run 
     lassign [install $prefix --default-host big.local] status output
     regexp {:token "([0-9a-f]{64})"} [slurp [dict get [paths $prefix] edn]] -> token
     list [expr {[string first "systemctl --user enable --now agento" $output] >= 0}] \
-         [expr {[string first "ANTHROPIC_BASE_URL=http://127.0.0.1:4141" $output] >= 0}] \
+         [expr {[string first "ANTHROPIC_BASE_URL=\$(tclsh " $output] >= 0 && [string first "hub-url.tcl" $output] >= 0}] \
          [expr {[string first "ANTHROPIC_AUTH_TOKEN=$token" $output] >= 0}]
 } -result {1 1 1}
 

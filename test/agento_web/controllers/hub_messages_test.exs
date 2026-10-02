@@ -212,6 +212,80 @@ defmodule AgentoWeb.HubMessagesTest do
     end
   end
 
+  describe "the turn log" do
+    alias Agento.Hub.TurnLog
+
+    # A model name no other test uses, so the newest row is unambiguously ours.
+    defp unique_request(name \\ "claude_code_request.json") do
+      model = "model-#{System.unique_integer([:positive])}"
+      # Keep the whitespace odd, to prove the stored bytes are the sent bytes.
+      body = name |> fixture() |> Jason.decode!() |> Map.put("model", model) |> Jason.encode!(pretty: true)
+      {model, body}
+    end
+
+    test "a successful turn is recorded with both bodies, the request byte for byte", ctx do
+      serve(ctx.bypass, "openai_text_stream.sse")
+      {model, body} = unique_request()
+      assert post(ctx.conn, "/v1/messages?beta=true", body).status == 200
+
+      assert [row] = TurnLog.recent(1)
+
+      assert %{
+               requested_model: ^model,
+               client: "test-client",
+               wire: "anthropic",
+               outcome: "ok",
+               stop_reason: "end_turn",
+               error: nil
+             } = row
+
+      assert row.ad_id == ctx.ad.id
+      assert is_binary(row.performer_model)
+      assert is_integer(row.input_tokens) and is_integer(row.output_tokens)
+      assert row.request_body == body
+      assert %{"type" => "message", "content" => content} = Jason.decode!(row.response_body)
+      assert %{"type" => "text", "text" => "hello there"} = List.last(content)
+    end
+
+    test "a turn with no performer is recorded as an error with no ad", ctx do
+      reset_registry()
+      {model, body} = unique_request()
+      assert post(ctx.conn, "/v1/messages", body).status == 404
+
+      assert [%{requested_model: ^model, outcome: "error", ad_id: nil, response_body: nil} = row] = TurnLog.recent(1)
+      assert row.error =~ model
+      assert row.request_body == body
+    end
+
+    test "a turn the performer failed is recorded as an error", ctx do
+      Bypass.down(ctx.bypass)
+      {model, body} = unique_request()
+      assert post(ctx.conn, "/v1/messages", body).status == 502
+
+      assert [%{requested_model: ^model, outcome: "error", response_body: nil} = row] = TurnLog.recent(1)
+      assert row.ad_id == ctx.ad.id
+      assert is_binary(row.error)
+    end
+
+    test "a request the hub could not decode is not recorded", ctx do
+      {model, _body} = unique_request()
+      assert post(ctx.conn, "/v1/messages", Jason.encode!(%{"model" => model})).status == 400
+
+      refute Enum.any?(TurnLog.recent(5), &(&1.requested_model == model))
+    end
+
+    test "the client is served even when the turn log is not running", ctx do
+      :ok = Supervisor.terminate_child(Agento.Supervisor, TurnLog)
+      on_exit(fn -> Supervisor.restart_child(Agento.Supervisor, TurnLog) end)
+
+      serve(ctx.bypass, "openai_text_stream.sse")
+      conn = post(ctx.conn, "/v1/messages", fixture("claude_code_request.json"))
+
+      assert conn.status == 200
+      assert {"message_stop", _} = conn.resp_body |> sse_frames() |> List.last()
+    end
+  end
+
   describe "Turn.run/5" do
     defp turn(name \\ "claude_code_request.json") do
       {:ok, turn} = name |> fixture() |> Jason.decode!() |> Anthropic.decode_request()

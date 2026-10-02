@@ -35,3 +35,6 @@ config :agento, harness_llm_client: AgentoWeb.TestLLMClient
 # The hub reads its clients from an edn file. Tests install their own config
 # with Agento.Hub.Config.put/1; at boot there is deliberately no file.
 config :agento, hub_config_path: "/nonexistent/agento-test-hub.edn"
+
+# The supervised turn log writes here, never under the developer's home.
+config :agento, hub_data_dir: Path.join(System.tmp_dir!(), "agento-test-hub-data")

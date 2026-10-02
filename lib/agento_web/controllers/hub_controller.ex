@@ -8,6 +8,7 @@ defmodule AgentoWeb.HubController do
 
   alias Agento.Hub.Config
   alias Agento.Hub.Router
+  alias Agento.Hub.TurnLog
   alias AgentoWeb.Hub.Turn
   alias LLMAgent.Codec.Anthropic
 
@@ -21,16 +22,22 @@ defmodule AgentoWeb.HubController do
 
     with {:ok, turn} <- Anthropic.decode_request(conn.body_params),
          {:route, turn, {:ok, ad}} <- {:route, turn, Router.route(turn.model, client, config)} do
-      {conn, _summary} = Turn.run(conn, turn, ad, client, config)
+      {conn, summary} = Turn.run(conn, turn, ad, client, config)
+      record(summary)
       conn
     else
       {:error, {_kind, what}} ->
         error(conn, 400, what)
 
       {:route, turn, {:error, :no_performer}} ->
-        error(conn, 404, "no performer is available for model #{inspect(turn.model)}")
+        message = "no performer is available for model #{inspect(turn.model)}"
+        record(Turn.refused(conn, turn, client, message))
+        error(conn, 404, message)
     end
   end
+
+  # Every turn that reached routing is recorded, however it ended.
+  defp record(summary), do: TurnLog.record(summary)
 
   defp error(conn, status, message) do
     conn |> put_status(status) |> json(Anthropic.encode_error(status, message))

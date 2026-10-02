@@ -16,6 +16,7 @@ defmodule Agento.Application do
       AgentoWeb.Discovery.Events,
       Agento.EventBusBridge,
       AgentoWeb.Harness.Registry,
+      hub_turn_log(),
       AgentoWeb.Endpoint
     ] ++ busybody_children()
 
@@ -23,6 +24,14 @@ defmodule Agento.Application do
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: Agento.Supervisor]
     Supervisor.start_link(children, opts)
+  end
+
+  defp hub_turn_log do
+    config = Agento.Hub.Config.get()
+
+    {Agento.Hub.TurnLog,
+     data_dir: Application.get_env(:agento, :hub_data_dir) || config.data_dir,
+     retention_days: config.retention_days}
   end
 
   # A hub configuration that cannot be trusted stops the node: serving with

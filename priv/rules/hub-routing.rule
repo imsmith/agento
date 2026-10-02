@@ -1,0 +1,42 @@
+; How the hub picks a performer for a turn. Installed to
+; ~/.config/agento/rules/hub-routing.rule; edit and save, it is deployed on
+; save. Delete it and the hub's built-in routing (the same two steps) takes
+; over.
+;
+; Every turn dispatches HUB_ROUTE, context path hub.route, with these facts:
+;
+;   ?client           the client's name from hub.edn
+;   ?requested_model  the model the client asked for
+;   ?serving_host     the host serving exactly that model, or ""
+;   ?default_host     the configured default host, or "" if it is not advertising
+;   ?hosts            every host the client may use
+;   ?models           what those hosts are serving
+;
+; A rule answers with [HUB::route :host "x"] (or :model "y", or :ad_id "z"),
+; or [HUB::refuse :because "..."]. A refusal beats a route; among routes the
+; one the runtime ran first wins, which is the rule loaded last — write
+; rules whose conditions exclude each other, as these two do. No answer
+; means the built-in routing decides. Routing waits one second for the
+; rules: do not call a tool from a HUB_ROUTE rule.
+
+rule route-to-the-host-serving-the-model {
+  context "hub" {
+    when HUB_ROUTE {
+      if ?serving_host != "" {
+        [HUB::route :model ?requested_model]
+      }
+    }
+  }
+}
+
+rule route-to-the-default-host {
+  context "hub" {
+    when HUB_ROUTE {
+      if ?serving_host == "" {
+        if ?default_host != "" {
+          [HUB::route :host ?default_host]
+        }
+      }
+    }
+  }
+}

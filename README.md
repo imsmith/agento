@@ -207,6 +207,7 @@ Erlang distribution and the port mapper stay on loopback regardless.
 | The hub at a glance | the Hub view (`/hub`): performers, clients, settings, recent turns, live |
 | Raw hub events | the Events view, topic `hub.request` |
 | Rules (`.rule` files, deployed on save) | `~/.config/agento/rules`, or `:rules {:dir ...}` in `hub.edn` |
+| The hub's routing, as rules | `~/.config/agento/rules/hub-routing.rule` |
 | The rules at a glance | the Rules view (`/rules`): what is loaded, its state, the last events, deploy and explain |
 
 The turn log has one row per turn: client, requested model, performer,
@@ -260,6 +261,33 @@ That list is the allow list of the policy every tool call from a rule is
 judged by, the same deny-by-default `LLMAgent.Tool.Policy` the hub's
 clients get. A rule can always emit onto the event bus and wait on it;
 what it may *call* is what this list gives it.
+
+### The hub's routing is a rule file
+
+Every turn dispatches `HUB_ROUTE` with the client, the requested model, the
+host serving exactly that model (`?serving_host`, or `""`), the default host
+if it is advertising (`?default_host`, or `""`), and the candidate `?hosts`
+and `?models`. A rule answers:
+
+```text
+rule small-models-for-pi {
+  context "hub" {
+    when HUB_ROUTE {
+      if ?client == "pi" { [HUB::route :host "skynet002.local"] }
+    }
+  }
+}
+```
+
+`[HUB::route :host "x"]`, `:model "y"` or `:ad_id "z"` picks among the
+performers the client may reach — a rule cannot widen that;
+`[HUB::refuse :because "..."]` answers the client with a 403. A refusal
+beats a route; among routes, the most recently loaded policy's answer
+wins, so write rules whose conditions exclude each other. No answer, and
+the built-in choice stands: the host serving
+the model, else the default host. The installer writes that choice as
+`~/.config/agento/rules/hub-routing.rule`, yours to edit; the file is never
+overwritten.
 
 The Rules view can also deploy and unload policies, but not by default:
 the web UI has no login, and a policy is code. `:rules {:ui-deploy true}`

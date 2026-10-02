@@ -33,6 +33,11 @@ defmodule AgentoWeb.HubController do
         message = "no performer is available for model #{inspect(turn.model)}"
         record(Turn.refused(conn, turn, client, message))
         error(conn, 404, message)
+
+      {:route, turn, {:error, {:refused, reason}}} ->
+        message = "refused by a rule: #{reason}"
+        record(Turn.refused(conn, turn, client, message))
+        error(conn, 403, message)
     end
   end
 

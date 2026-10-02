@@ -44,6 +44,7 @@ proc paths {prefix} {
         edn  [file join $prefix .config agento hub.edn] \
         env  [file join $prefix .config agento env] \
         unit [file join $prefix .config systemd user agento.service] \
+        rule [file join $prefix .config agento rules hub-routing.rule] \
         data [file join $prefix .local share agento]]
 }
 
@@ -141,6 +142,18 @@ test dry-run-writes-nothing {--dry-run reports and writes nothing} -body {
     list $status [glob -nocomplain -directory $prefix -types {f d} * .config .local] \
          [expr {[string first "hub.edn" $output] >= 0}]
 } -result {0 {} 1}
+
+test ships-the-routing-rule {a fresh install writes the routing rule file, and keeps an edited one} -body {
+    set prefix [fresh_prefix]
+    install $prefix --default-host big.local
+    set rule [dict get [paths $prefix] rule]
+    set shipped [slurp [file join $::here .. .. priv rules hub-routing.rule]]
+    set first [expr {[slurp $rule] eq $shipped}]
+    set fh [open $rule w]; puts $fh "rule mine { when HUB_ROUTE { log 1 } }"; close $fh
+    lassign [install $prefix --default-host big.local] status output
+    set named [regexp -line ":rules \{:dir \"$prefix/.config/agento/rules\"\}" [slurp [dict get [paths $prefix] edn]]]
+    list $first [expr {[string first "keeping $rule" $output] >= 0}] [string trim [slurp $rule]] $named
+} -result {1 1 {rule mine { when HUB_ROUTE { log 1 } }} 1}
 
 test tokens-differ {two fresh installs generate different tokens} -body {
     set a [fresh_prefix]

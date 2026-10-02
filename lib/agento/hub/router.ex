@@ -8,9 +8,26 @@ defmodule Agento.Hub.Router do
   here first so that an ad the client may not use is never chosen, and never
   listed.
 
-  Among candidates the choice is static:
+  The rules decide first. Every turn is dispatched into the `:agento`
+  runtime as `HUB_ROUTE` (context path `hub.route`) with the client, the
+  requested model, the host serving exactly that model, the default host
+  if it is advertising, and the candidate hosts and models as facts. A rule
+  answers with `[HUB::route :host "x"]` (or `:model`, or `:ad_id`), or
+  `[HUB::refuse :because "..."]`. A refusal beats a route. Among several
+  routes the one the runtime ran first wins, and that order is the
+  runtime's: the most recently loaded policy answers first, and within a
+  policy the later rule. Write one rule that decides, or rules whose
+  conditions exclude each other, rather than relying on it. See
+  `priv/rules/hub-routing.rule`, which says the built-in routing in rules.
 
-    1. the one serving exactly the model the client asked for;
+  Routing waits one second for the rules. A `HUB_ROUTE` rule that calls a
+  tool makes every turn wait for it, and past the second the turn takes
+  the built-in choice while the rule's work still runs.
+
+  When no rule answers — none loaded, none matched, or the runtime did not
+  answer in time — the choice is the built-in one:
+
+    1. the candidate serving exactly the model the client asked for;
     2. otherwise the one on the configured default host;
     3. otherwise nothing.
 
@@ -18,7 +35,12 @@ defmodule Agento.Hub.Router do
   serves whatever it serves when the turn arrives; the default is a host.
   Coding clients ask for their own vendor's model names, which no local host
   serves, so in practice rule 2 carries most turns.
+
+  A rule's answer is held to the same candidates: a host or model the
+  client's policy does not admit cannot be routed to by naming it.
   """
+
+  require Logger
 
   alias Agento.Hub.Config
   alias LLMAgent.{ToolAd, ToolQuery}
@@ -31,18 +53,82 @@ defmodule Agento.Hub.Router do
 
   @doc "The ad that should serve `requested_model` for `client`."
   @spec route(String.t() | nil, Config.client(), Config.t()) ::
-          {:ok, ToolAd.t()} | {:error, :no_performer}
+          {:ok, ToolAd.t()} | {:error, :no_performer | {:refused, String.t()}}
   def route(requested_model, client, %Config{default_host: default_host}) do
     candidates = candidates(client)
 
     serving = Enum.find(candidates, &(model(&1) == requested_model and requested_model != nil))
     default = default_host && Enum.find(candidates, &on_host?(&1, default_host))
 
-    case serving || default do
-      %ToolAd{} = ad -> {:ok, ad}
-      _ -> {:error, :no_performer}
+    facts = %{
+      "client" => client.name,
+      "requested_model" => requested_model || "",
+      "serving_host" => (serving && host(serving)) || "",
+      "default_host" => (default && host(default)) || "",
+      "hosts" => candidates |> Enum.map(&host/1) |> Enum.reject(&is_nil/1) |> Enum.uniq(),
+      "models" => candidates |> Enum.map(&model/1) |> Enum.reject(&is_nil/1) |> Enum.uniq()
+    }
+
+    case ask_rules(facts, candidates) do
+      {:ok, %ToolAd{} = ad} ->
+        {:ok, ad}
+
+      {:refused, reason} ->
+        {:error, {:refused, reason}}
+
+      :undecided ->
+        case serving || default do
+          %ToolAd{} = ad -> {:ok, ad}
+          _ -> {:error, :no_performer}
+        end
     end
   end
+
+  # The first answer a rule gave, applied to the candidates. An answer
+  # naming nothing among them is ignored, with a line in the log: a rule
+  # cannot widen what the client may reach, only choose within it.
+  defp ask_rules(facts, candidates) do
+    context = %{context_path: "hub.route", context_data: facts}
+
+    case Anemos.Runtime.dispatch(Agento.Rules.runtime(), "HUB_ROUTE", context, timeout: 1_000) do
+      {:ok, results} ->
+        answers = for %{hub: _} = answer <- results, do: answer
+
+        Enum.find_value(answers, &refusal/1) ||
+          Enum.find_value(answers, :undecided, &answer(&1, candidates))
+    end
+  catch
+    :exit, reason ->
+      Logger.warning("[hub] the rules did not answer HUB_ROUTE: #{inspect(elem_or(reason))}")
+      :undecided
+  end
+
+  defp refusal(%{hub: :refuse, because: reason}) when is_binary(reason), do: {:refused, reason}
+  defp refusal(_other), do: nil
+
+  defp answer(%{hub: :route, choice: choice}, candidates) do
+    found =
+      case choice do
+        %{"host" => h} -> Enum.find(candidates, &on_host?(&1, h))
+        %{"model" => m} -> Enum.find(candidates, &(model(&1) == m))
+        %{"ad_id" => id} -> Enum.find(candidates, &(&1.id == id))
+        _ -> nil
+      end
+
+    if found do
+      {:ok, found}
+    else
+      # Debug, not warning: this is per turn, and the Rules view's trace
+      # shows the rule firing.
+      Logger.debug("[hub] a rule routed to #{inspect(choice)}, which the client cannot reach")
+      nil
+    end
+  end
+
+  defp answer(_other, _candidates), do: nil
+
+  defp elem_or({tag, _}) when is_atom(tag), do: tag
+  defp elem_or(other), do: other
 
   @doc "The models `client` can reach right now, one entry per performer."
   @spec models(Config.client()) :: [model_entry()]

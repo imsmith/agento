@@ -34,7 +34,9 @@ defmodule Agento.Rules do
   def policy, do: %Policy{allow: Config.get().rules_tools, fidelity_min: :authoritative}
 
   @doc false
-  def runtime_spec, do: {Anemos.Runtime, name: @runtime, watch: dir()}
+  def runtime_spec do
+    {Anemos.Runtime, name: @runtime, watch: dir(), modules: %{"HUB" => Agento.Hub.RouteVerb}}
+  end
 
   @doc false
   def attachment_spec, do: {LLMAgent.Anemos, runtime: @runtime, policy: policy()}

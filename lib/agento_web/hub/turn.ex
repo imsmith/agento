@@ -15,14 +15,21 @@ defmodule AgentoWeb.Hub.Turn do
   canonical event the task sends it here and waits for `:cont` or `:halt`.
   That gives backpressure, and lets a failed write halt the performer.
 
-  The task is linked to the connection process. If that process is killed,
-  the task dies with it and its connection to the performer closes, so a
-  client that vanishes does not leave a performer generating for nobody.
+  The two processes watch each other rather than link. A real listener's
+  connection process traps exits, so a link would neither kill it nor tell
+  it anything it is waiting for:
 
-  One case is not caught: a client that hangs up while the performer is
-  still silent. Nothing is being written, so nothing fails, and the turn
-  runs until the performer's first event, when the write fails and the
-  performer is halted.
+    * if the task dies — a crash inside the dispatch — the connection
+      process sees the monitor's `:DOWN` and answers with an error instead
+      of waiting forever;
+    * if the connection process dies, a watcher kills the task, which closes
+      its connection to the performer, so a client that vanishes does not
+      leave a performer generating for nobody.
+
+  One case is not caught: a client that hangs up while nothing is being
+  written — while the performer is still silent, between its chunks, or
+  during a non-streaming turn. Nothing fails until the next write, so the
+  turn runs on until then.
 
   ## When the response starts
 
@@ -78,10 +85,12 @@ defmodule AgentoWeb.Hub.Turn do
     conn =
       conn
       |> put_resp_header("x-hub-performer", ad.id)
-      |> put_resp_header("x-hub-billing", "local")
+      |> put_resp_header("x-hub-billing", billing(ad))
 
     task =
-      Task.Supervisor.async(LLMAgent.TaskSup, fn ->
+      Task.Supervisor.async_nolink(LLMAgent.TaskSup, fn ->
+        kill_when_gone(owner, self())
+
         into = fn event ->
           send(owner, {ref, :event, event, self()})
 
@@ -130,6 +139,24 @@ defmodule AgentoWeb.Hub.Turn do
     |> Map.merge(%{outcome: "error", error: error})
   end
 
+  # Says "local" only for a performer the mDNS shim found on this network.
+  # Anything else is reached with a credential and billed to it.
+  defp billing(%ToolAd{provenance: %{source: "mdns/" <> _}}), do: "local"
+  defp billing(%ToolAd{}), do: "api-key"
+
+  # Kills `task` if `owner` dies first; goes away quietly when the task ends.
+  defp kill_when_gone(owner, task) do
+    spawn(fn ->
+      owner_ref = Process.monitor(owner)
+      task_ref = Process.monitor(task)
+
+      receive do
+        {:DOWN, ^owner_ref, :process, _pid, _reason} -> Process.exit(task, :kill)
+        {:DOWN, ^task_ref, :process, _pid, _reason} -> :ok
+      end
+    end)
+  end
+
   defp base_summary(conn, turn, client, at, started) do
     %{
       at: at,
@@ -163,6 +190,9 @@ defmodule AgentoWeb.Hub.Turn do
       {^task_ref, result} ->
         Process.demonitor(task_ref, [:flush])
         {state, result}
+
+      {:DOWN, ^task_ref, :process, _pid, reason} ->
+        {state, {:error, {:dispatch_crashed, reason}}}
     end
   end
 
@@ -254,6 +284,7 @@ defmodule AgentoWeb.Hub.Turn do
 
   # What the turn log keeps: short, and free of internal structure.
   defp describe({:forbidden, why}), do: "forbidden: #{why}"
+  defp describe({:dispatch_crashed, _reason}), do: "the dispatch crashed"
 
   defp describe({:http_error, status, body}),
     do: "performer answered #{status}: #{performer_message(body)}"

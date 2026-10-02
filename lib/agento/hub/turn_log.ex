@@ -26,6 +26,12 @@ defmodule Agento.Hub.TurnLog do
 
   A turn whose connection process was killed is not recorded: the summary is
   built by that process, and it is gone.
+
+  Rows arrive from clients and performers, so a value SQLite cannot store —
+  a model name that is not a string, a token count that is not a number — is
+  expected input, not a bug: the row is dropped and only the reason is
+  logged. `format_status/1` keeps a pending row's bodies out of any crash
+  report.
   """
 
   use GenServer
@@ -40,6 +46,7 @@ defmodule Agento.Hub.TurnLog do
   @columns ~w(at client wire requested_model ad_id performer_model outcome stop_reason
               input_tokens output_tokens duration_ms error request_body response_body)a
   @blobs [:request_body, :response_body]
+  @integers [:input_tokens, :output_tokens, :duration_ms]
 
   @schema """
   CREATE TABLE IF NOT EXISTS turns (
@@ -111,9 +118,12 @@ defmodule Agento.Hub.TurnLog do
   def handle_cast({:record, _row}, %{db: nil} = state), do: {:noreply, state}
 
   def handle_cast({:record, row}, state) do
-    case insert(state.db, row) do
+    case storable(row) && insert(state.db, row) do
       :ok ->
         :ok
+
+      false ->
+        Logger.error("turn log: a turn carried a value of the wrong type, dropping it")
 
       {:error, reason} ->
         Logger.error("turn log: could not record a turn, dropping it: #{inspect(reason)}")
@@ -148,6 +158,15 @@ defmodule Agento.Hub.TurnLog do
     Process.send_after(self(), :prune, @prune_every_ms)
     {:noreply, state}
   end
+
+  @doc false
+  @impl true
+  def format_status(%{message: {:"$gen_cast", {:record, row}}} = status) when is_map(row) do
+    redacted = Map.merge(row, %{request_body: "[redacted]", response_body: "[redacted]"})
+    %{status | message: {:"$gen_cast", {:record, redacted}}}
+  end
+
+  def format_status(status), do: status
 
   @impl true
   def terminate(_reason, %{db: nil}), do: :ok
@@ -195,6 +214,18 @@ defmodule Agento.Hub.TurnLog do
     end
   end
 
+  # Every column holds text, an integer, or nothing. SQLite would take some
+  # other values and store them as something else; a row is all or nothing.
+  defp storable(row) do
+    Enum.all?(@columns, fn column ->
+      case Map.get(row, column) do
+        nil -> true
+        value when column in @integers -> is_integer(value)
+        value -> is_binary(value)
+      end
+    end)
+  end
+
   defp bind_value(_column, nil), do: nil
   defp bind_value(column, value) when column in @blobs, do: {:blob, value}
   defp bind_value(_column, value), do: value
@@ -219,11 +250,15 @@ defmodule Agento.Hub.TurnLog do
     {count, state}
   end
 
-  # Prepare, bind, step to completion, release. Returns the rows.
+  # Prepare, bind, step to completion, release. Returns the rows. Binding
+  # raises on a value SQLite has no type for; that becomes an error carrying
+  # the exception's message and nothing from the row.
   defp query(db, sql, params) do
     with {:ok, statement} <- Sqlite3.prepare(db, sql) do
       try do
         with :ok <- Sqlite3.bind(statement, params), do: steps(db, statement, [])
+      rescue
+        error in ArgumentError -> {:error, Exception.message(error)}
       after
         Sqlite3.release(db, statement)
       end

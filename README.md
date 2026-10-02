@@ -158,6 +158,10 @@ entries to `:clients` in `hub.edn` and restart the unit.
   byte; later turns in the session reuse the cached prompt and answer in
   seconds. `:performer-timeout-seconds` (default 900) is how long the hub
   waits.
+- **An abandoned request runs until its next write.** The hub notices a
+  client has gone only when a write to it fails. Claude Code opens a second,
+  small request beside each main one and drops it; that request holds a
+  performer slot until the performer produces its first token.
 - **Model quality is the model's.** The hub carries tool calls faithfully. A
   small local model may still handle Claude Code's tool set poorly.
 

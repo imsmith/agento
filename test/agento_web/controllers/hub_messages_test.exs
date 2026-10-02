@@ -113,7 +113,10 @@ defmodule AgentoWeb.HubMessagesTest do
       assert Enum.any?(request["messages"], &(&1["role"] == "tool"))
     end
 
-    test "waits out a performer that is slow to its first byte", ctx do
+    # With the 504 test below, this pins that the configured timeout is what
+    # governs how long a silent performer is waited for.
+    test "waits for a silent performer for as long as the configured timeout allows", ctx do
+      install_config(default_host: "skynet-test.local", performer_timeout_ms: 5_000)
       serve(ctx.bypass, "openai_text_stream.sse", delay: 1_500)
       conn = post(ctx.conn, "/v1/messages", fixture("claude_code_request.json"))
 
@@ -172,6 +175,27 @@ defmodule AgentoWeb.HubMessagesTest do
                ctx.conn |> post("/v1/messages", Jason.encode!(body)) |> error_body(400)
 
       assert message =~ "server_tool_use"
+    end
+
+    test "a model that is not a string is a 400, and the turn log is unharmed", ctx do
+      never_contacted(ctx.bypass)
+      log = Process.whereis(Agento.Hub.TurnLog)
+
+      body =
+        "claude_code_request.json"
+        |> fixture()
+        |> Jason.decode!()
+        |> Map.put("model", %{"a" => 1})
+
+      for _ <- 1..5 do
+        assert {"invalid_request_error", message} =
+                 ctx.conn |> post("/v1/messages", Jason.encode!(body)) |> error_body(400)
+
+        assert message =~ "model"
+      end
+
+      assert Agento.Hub.TurnLog.recent(1) |> is_list()
+      assert Process.whereis(Agento.Hub.TurnLog) == log
     end
 
     test "a body that is not a Messages request is a 400", ctx do
@@ -458,6 +482,60 @@ defmodule AgentoWeb.HubMessagesTest do
                summary
 
       assert is_binary(summary.error)
+    end
+
+    # A real listener's connection process traps exits, so a dispatch task
+    # that dies does not take it down: it has to notice and answer.
+    @tag timeout: 15_000
+    test "a dispatch that crashes is a 502, not a hang", ctx do
+      Process.flag(:trap_exit, true)
+      # Req raises on a host with no scheme.
+      ad = llama_ad(id: "broken.1", api_host: "no-scheme-host:1", model: "performer.gguf")
+
+      assert {conn, summary} = Turn.run(test_conn("{}"), turn(), ad, ctx.client, ctx.config)
+      assert {"api_error", _} = error_body(conn, 502)
+      assert %{outcome: "error", error: error} = summary
+      assert is_binary(error)
+    end
+
+    test "a client that has hung up is recorded as aborted and the performer is halted", ctx do
+      serve(ctx.bypass, "openai_text_stream.sse")
+      conn = "{}" |> test_conn() |> AgentoWeb.ClosingConn.wrap()
+
+      assert {_conn, summary} = Turn.run(conn, turn(), ctx.ad, ctx.client, ctx.config)
+
+      assert %{
+               outcome: "aborted",
+               error: "client disconnected",
+               stop_reason: nil,
+               response_body: nil
+             } =
+               summary
+    end
+
+    test "x-hub-billing says what the performer's provenance says", ctx do
+      serve(ctx.bypass, "openai_text_stream.sse")
+      {conn, _} = Turn.run(test_conn("{}"), turn(), ctx.ad, ctx.client, ctx.config)
+      assert get_resp_header(conn, "x-hub-billing") == ["local"]
+
+      # No client can reach such an ad in this build; the header must still
+      # never call it local.
+      paid =
+        llama_ad(
+          id: "cloud.1",
+          api_host: "http://localhost:#{ctx.bypass.port}",
+          source: "hub.config"
+        )
+
+      open_client = %{
+        ctx.client
+        | policy: %Policy{allow: ["compute.llm.chat"], fidelity_min: :authoritative}
+      }
+
+      serve(ctx.bypass, "openai_text_stream.sse")
+
+      {conn, _} = Turn.run(test_conn("{}"), turn(), paid, open_client, ctx.config)
+      assert get_resp_header(conn, "x-hub-billing") == ["api-key"]
     end
 
     test "a client whose policy allows nothing is a 403 and the performer is not contacted",

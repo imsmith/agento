@@ -83,6 +83,16 @@ test env-file-binds-loopback {the env file binds loopback and points at this pre
          [regexp -line "^AGENTO_HUB_CONFIG=$prefix/.config/agento/hub.edn\$" $envtext]
 } -result {1 1 1 1 1}
 
+test env-file-keeps-distribution-on-loopback {Erlang distribution and epmd are bound to loopback too} -body {
+    set prefix [fresh_prefix]
+    install $prefix --default-host big.local
+    set envtext [slurp [dict get [paths $prefix] env]]
+    list [regexp -line {^ERL_EPMD_ADDRESS=127\.0\.0\.1$} $envtext] \
+         [regexp -line {^ERL_AFLAGS="-kernel inet_dist_use_interface \{127,0,0,1\}"$} $envtext] \
+         [regexp -line {^RELEASE_DISTRIBUTION=name$} $envtext] \
+         [regexp -line {^RELEASE_NODE=agento_4141@127\.0\.0\.1$} $envtext]
+} -result {1 1 1 1}
+
 test config-names-host-and-client {the config has one client with a long token and the default host} -body {
     set prefix [fresh_prefix]
     install $prefix --default-host big.local

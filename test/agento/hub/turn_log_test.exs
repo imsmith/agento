@@ -158,6 +158,43 @@ defmodule Agento.Hub.TurnLogTest do
     assert {:ok, 0} = TurnLog.prune(DateTime.utc_now(), name)
   end
 
+  test "a value the database cannot bind is dropped without crashing or logging a body", %{
+    dir: dir
+  } do
+    log = start(dir)
+    pid = Process.whereis(log)
+    secret = "prompt-text-that-must-not-be-logged"
+
+    output =
+      capture_log(fn ->
+        for bad <- [%{"a" => 1}, ["x"], {1, 2}] do
+          TurnLog.record(row(%{requested_model: bad, request_body: secret}), log)
+          TurnLog.record(row(%{input_tokens: bad, request_body: secret}), log)
+        end
+
+        assert TurnLog.recent(10, log) == []
+      end)
+
+    assert output =~ "turn log"
+    refute output =~ secret
+    assert Process.whereis(log) == pid
+
+    TurnLog.record(row(), log)
+    assert [_] = TurnLog.recent(10, log)
+  end
+
+  test "a crash report shows neither body" do
+    secret = "prompt-text-that-must-not-be-logged"
+
+    status = %{
+      message: {:"$gen_cast", {:record, row(%{request_body: secret, response_body: secret})}},
+      state: %{}
+    }
+
+    refute inspect(TurnLog.format_status(status), limit: :infinity, printable_limit: :infinity) =~
+             secret
+  end
+
   test "recording to a log that is not running returns :ok" do
     assert :ok = TurnLog.record(row(), :no_such_turn_log)
   end

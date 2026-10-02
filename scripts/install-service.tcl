@@ -90,9 +90,16 @@ proc env_file {secret port hub_edn} {
     append env "PHX_HOST=localhost\n"
     append env "PORT=$port\n"
     append env "AGENTO_BIND=127.0.0.1\n"
+    # A release also listens for Erlang distribution (bin/agento rpc, stop).
+    # Keep that, and the port mapper, on loopback as well. The node is named
+    # at 127.0.0.1 so that rpc and stop look for it where it listens; a short
+    # name would resolve to the machine's LAN address. The name is distinct
+    # per port, so a second copy on the same machine does not collide.
+    append env "ERL_EPMD_ADDRESS=127.0.0.1\n"
+    append env "ERL_AFLAGS=\"-kernel inet_dist_use_interface {127,0,0,1}\"\n"
+    append env "RELEASE_DISTRIBUTION=name\n"
+    append env "RELEASE_NODE=agento_$port@127.0.0.1\n"
     append env "AGENTO_HUB_CONFIG=$hub_edn\n"
-    # Distinct per port, so a second copy on the same machine does not collide.
-    append env "RELEASE_NODE=agento_$port\n"
     return $env
 }
 

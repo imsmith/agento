@@ -98,7 +98,7 @@ defmodule Agento.Hub.ConfigTest do
 
     test "malformed edn is refused", %{dir: dir} do
       assert {:error, message} = Config.load(write(dir, "{:clients ["))
-      assert message =~ "edn"
+      assert message =~ "malformed"
 
       assert {:error, message} = Config.load(write(dir, "[1 2 3]"))
       assert message =~ "map"

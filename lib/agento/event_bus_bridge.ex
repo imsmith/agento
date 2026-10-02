@@ -25,6 +25,7 @@ defmodule Agento.EventBusBridge do
     "agent.message",
     "agent.error",
     "tool.inotify.event",
+    "hub.request",
     "web.mount",
     "web.event",
     "web.prompt_sent",

@@ -63,6 +63,10 @@ defmodule Agento.MixProject do
       {:bandit, "~> 1.5"},
       {:LLMAgent, path: "../llmagent"},
       # Comn comes transitively through LLMAgent
+      # Hub: edn configuration and the SQLite turn log
+      {:ex_edn, path: "../ex_edn"},
+      {:exqlite, "~> 0.27"},
+      {:bypass, "~> 2.1", only: :test},
       {:busybody, path: "../busybody", only: :dev}
     ]
   end

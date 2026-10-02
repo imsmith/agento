@@ -1,0 +1,22 @@
+; agento hub configuration. Copy to ~/.config/agento/hub.edn and chmod 600:
+; this file holds tokens, and the hub refuses to start if anyone but its owner
+; can read it.
+;
+; Each client is one program that points at the hub. Give each its own token
+; (at least 16 characters; `openssl rand -hex 32` makes a good one).
+{:clients [{:name "claude-code" :token "replace-me-with-a-long-random-token"}]
+
+ ; Where a request goes when it asks for a model no host is serving, which is
+ ; always the case for Claude Code's own model names. Names a host, never a
+ ; model: the hub uses whatever that host is serving when the turn arrives.
+ :default-host "skynet001.local"
+
+ ; Turn-log rows older than this are deleted.
+ :retention-days 30
+
+ ; How long a performer may stay silent. A large first prompt can take
+ ; minutes before the first byte.
+ :performer-timeout-seconds 900
+
+ ; The turn log and the durable event log live here.
+ :data-dir "~/.local/share/agento"}

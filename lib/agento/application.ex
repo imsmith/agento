@@ -7,6 +7,8 @@ defmodule Agento.Application do
 
   @impl true
   def start(_type, _args) do
+    load_hub_config!()
+
     children = [
       AgentoWeb.Telemetry,
       {DNSCluster, query: Application.get_env(:agento, :dns_cluster_query) || :ignore},
@@ -14,6 +16,7 @@ defmodule Agento.Application do
       AgentoWeb.Discovery.Events,
       Agento.EventBusBridge,
       AgentoWeb.Harness.Registry,
+      hub_turn_log(),
       AgentoWeb.Endpoint
     ] ++ busybody_children()
 
@@ -21,6 +24,24 @@ defmodule Agento.Application do
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: Agento.Supervisor]
     Supervisor.start_link(children, opts)
+  end
+
+  defp hub_turn_log do
+    config = Agento.Hub.Config.get()
+
+    {Agento.Hub.TurnLog,
+     data_dir: Application.get_env(:agento, :hub_data_dir) || config.data_dir,
+     retention_days: config.retention_days}
+  end
+
+  # A hub configuration that cannot be trusted stops the node: serving with
+  # the wrong clients, or none of the intended limits, is worse than not
+  # serving.
+  defp load_hub_config! do
+    case Agento.Hub.Config.load(Agento.Hub.Config.path()) do
+      {:ok, config} -> Agento.Hub.Config.put(config)
+      {:error, message} -> raise "agento hub configuration: #{message}"
+    end
   end
 
   defp busybody_children do

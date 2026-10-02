@@ -13,8 +13,16 @@ defmodule Agento.Hub.Router do
   requested model, the host serving exactly that model, the default host
   if it is advertising, and the candidate hosts and models as facts. A rule
   answers with `[HUB::route :host "x"]` (or `:model`, or `:ad_id`), or
-  `[HUB::refuse :because "..."]`; the first answer wins. See
+  `[HUB::refuse :because "..."]`. A refusal beats a route. Among several
+  routes the one the runtime ran first wins, and that order is the
+  runtime's: the most recently loaded policy answers first, and within a
+  policy the later rule. Write one rule that decides, or rules whose
+  conditions exclude each other, rather than relying on it. See
   `priv/rules/hub-routing.rule`, which says the built-in routing in rules.
+
+  Routing waits one second for the rules. A `HUB_ROUTE` rule that calls a
+  tool makes every turn wait for it, and past the second the turn takes
+  the built-in choice while the rule's work still runs.
 
   When no rule answers — none loaded, none matched, or the runtime did not
   answer in time — the choice is the built-in one:
@@ -83,7 +91,11 @@ defmodule Agento.Hub.Router do
     context = %{context_path: "hub.route", context_data: facts}
 
     case Anemos.Runtime.dispatch(Agento.Rules.runtime(), "HUB_ROUTE", context, timeout: 1_000) do
-      {:ok, results} -> Enum.find_value(results, :undecided, &answer(&1, candidates))
+      {:ok, results} ->
+        answers = for %{hub: _} = answer <- results, do: answer
+
+        Enum.find_value(answers, &refusal/1) ||
+          Enum.find_value(answers, :undecided, &answer(&1, candidates))
     end
   catch
     :exit, reason ->
@@ -91,9 +103,10 @@ defmodule Agento.Hub.Router do
       :undecided
   end
 
-  defp answer(%{refuse: reason}, _candidates) when is_binary(reason), do: {:refused, reason}
+  defp refusal(%{hub: :refuse, because: reason}) when is_binary(reason), do: {:refused, reason}
+  defp refusal(_other), do: nil
 
-  defp answer(%{route: choice}, candidates) do
+  defp answer(%{hub: :route, choice: choice}, candidates) do
     found =
       case choice do
         %{"host" => h} -> Enum.find(candidates, &on_host?(&1, h))
@@ -105,7 +118,9 @@ defmodule Agento.Hub.Router do
     if found do
       {:ok, found}
     else
-      Logger.warning("[hub] a rule routed to #{inspect(choice)}, which the client cannot reach")
+      # Debug, not warning: this is per turn, and the Rules view's trace
+      # shows the rule firing.
+      Logger.debug("[hub] a rule routed to #{inspect(choice)}, which the client cannot reach")
       nil
     end
   end

@@ -84,14 +84,15 @@ proc write_file {path content} {
     close $fh
 }
 
-proc hub_edn {token default_host data_dir} {
+proc hub_edn {token default_host data_dir rules_dir} {
     set edn "; agento hub configuration. Holds tokens: keep it mode 0600.\n"
     append edn "; See priv/hub.example.edn in the agento repository for every key.\n"
     append edn "{:clients \[{:name \"claude-code\" :token \"$token\"}\]\n"
     if {$default_host ne ""} {
         append edn " :default-host \"$default_host\"\n"
     }
-    append edn " :data-dir \"$data_dir\"}\n"
+    append edn " :data-dir \"$data_dir\"\n"
+    append edn " :rules {:dir \"$rules_dir\"}}\n"
     return $edn
 }
 
@@ -184,7 +185,7 @@ proc main {argv} {
         puts "keeping $hub_edn"
     } else {
         set token [binary encode hex [random_bytes 32]]
-        write_secret $hub_edn [hub_edn $token [dict get $opts default_host] $data_dir]
+        write_secret $hub_edn [hub_edn $token [dict get $opts default_host] $data_dir $rules_dir]
         puts "wrote $hub_edn"
     }
 

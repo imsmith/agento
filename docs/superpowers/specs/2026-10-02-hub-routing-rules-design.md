@@ -18,6 +18,23 @@ the default host, else 404. `priv/rules/hub-routing.rule` says that choice
 in rules; the installer writes it to `~/.config/agento/rules/` once and
 never again.
 
+## What the review added
+
+- Answers are tagged as `HUB`'s; a tool's result shaped like one is not an
+  answer. A refusal beats a route. Among routes the runtime's order
+  decides — the most recently loaded policy first, and within a policy
+  the later rule — which the README, the rule file and the router say
+  plainly, with the advice to write rules whose conditions exclude each
+  other.
+- The shipped rule routes by `:model ?requested_model`, not by host: one
+  host serving two models would otherwise get the wrong one.
+- The installer writes `:rules {:dir ...}` into the generated hub.edn, so
+  a non-home `--prefix` watches where it installed the rule.
+- The shipped-rule test checks the trace: the rule fired and answered,
+  not merely that the built-in choice would have agreed.
+- Not changed: a `HUB_ROUTE` rule that calls a tool makes every turn wait
+  for it, up to the second; the rule file says not to.
+
 ## Rulings
 
 1. **A rule chooses within the client's candidates, never beyond.** An

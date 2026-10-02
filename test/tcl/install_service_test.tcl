@@ -151,8 +151,9 @@ test ships-the-routing-rule {a fresh install writes the routing rule file, and k
     set first [expr {[slurp $rule] eq $shipped}]
     set fh [open $rule w]; puts $fh "rule mine { when HUB_ROUTE { log 1 } }"; close $fh
     lassign [install $prefix --default-host big.local] status output
-    list $first [expr {[string first "keeping $rule" $output] >= 0}] [string trim [slurp $rule]]
-} -result {1 1 {rule mine { when HUB_ROUTE { log 1 } }}}
+    set named [regexp -line ":rules \{:dir \"$prefix/.config/agento/rules\"\}" [slurp [dict get [paths $prefix] edn]]]
+    list $first [expr {[string first "keeping $rule" $output] >= 0}] [string trim [slurp $rule]] $named
+} -result {1 1 {rule mine { when HUB_ROUTE { log 1 } }} 1}
 
 test tokens-differ {two fresh installs generate different tokens} -body {
     set a [fresh_prefix]

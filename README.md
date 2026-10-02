@@ -281,8 +281,10 @@ rule small-models-for-pi {
 
 `[HUB::route :host "x"]`, `:model "y"` or `:ad_id "z"` picks among the
 performers the client may reach — a rule cannot widen that;
-`[HUB::refuse :because "..."]` answers the client with a 403. The first
-answer wins. No answer, and the built-in choice stands: the host serving
+`[HUB::refuse :because "..."]` answers the client with a 403. A refusal
+beats a route; among routes, the most recently loaded policy's answer
+wins, so write rules whose conditions exclude each other. No answer, and
+the built-in choice stands: the host serving
 the model, else the default host. The installer writes that choice as
 `~/.config/agento/rules/hub-routing.rule`, yours to edit; the file is never
 overwritten.

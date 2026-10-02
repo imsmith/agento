@@ -6,8 +6,8 @@ defmodule Agento.Hub.RouteVerb do
       [HUB::refuse :because "not during the backup window"]
 
   Bound in the `:agento` runtime from the start. A verb here decides
-  nothing: it records an answer, and `Agento.Hub.Router` reads the answers
-  a `HUB_ROUTE` dispatch produced.
+  nothing: it records an answer, tagged as this module's, and
+  `Agento.Hub.Router` reads the answers a `HUB_ROUTE` dispatch produced.
   """
 
   @behaviour Anemos.Runtime.Module
@@ -16,7 +16,7 @@ defmodule Agento.Hub.RouteVerb do
   def handle_verb("route", args, _context) do
     with {:ok, pairs} <- pairs(args) do
       case Map.take(pairs, ["host", "model", "ad_id"]) do
-        choice when map_size(choice) == 1 -> {:ok, %{route: choice}}
+        choice when map_size(choice) == 1 -> {:ok, %{hub: :route, choice: choice}}
         _ -> {:error, :route_takes_one_of_host_model_ad_id}
       end
     end
@@ -24,7 +24,7 @@ defmodule Agento.Hub.RouteVerb do
 
   def handle_verb("refuse", args, _context) do
     with {:ok, pairs} <- pairs(args) do
-      {:ok, %{refuse: Map.get(pairs, "because", "refused by a rule")}}
+      {:ok, %{hub: :refuse, because: Map.get(pairs, "because", "refused by a rule")}}
     end
   end
 

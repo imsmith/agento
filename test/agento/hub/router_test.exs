@@ -173,16 +173,40 @@ defmodule Agento.Hub.RouterRulesTest do
     assert id == ctx.small.id
   end
 
-  test "the shipped routing rule says the built-in routing", ctx do
-    :ok = Rules.load(@policy, File.read!("priv/rules/hub-routing.rule"))
+  test "a refusal beats a route, whichever answered first", ctx do
+    :ok =
+      Rules.load(@policy, """
+      rule yes { context "hub" { when HUB_ROUTE { [HUB::route :host "small.local"] } } }
+      rule no { context "hub" { when HUB_ROUTE { [HUB::refuse :because "no"] } } }
+      """)
 
-    assert {:ok, %{id: id}} = Router.route("small.gguf", ctx.client, ctx.config)
-    assert id == ctx.small.id
+    assert {:error, {:refused, "no"}} = Router.route("x", ctx.client, ctx.config)
+  end
+
+  test "the shipped routing rule says the built-in routing, and it is the rules that said it",
+       ctx do
+    :ok = Rules.load(@policy, File.read!("priv/rules/hub-routing.rule"))
+    # A second model on the big host: routing by host alone would pick the
+    # wrong one of the two.
+    tiny = register(host: "big.local", model: "tiny.gguf", id: "mdns:_llama._tcp:big.local:8081")
+
+    assert {:ok, %{id: id}} = Router.route("tiny.gguf", ctx.client, ctx.config)
+    assert id == tiny.id
+    assert fired("route-to-the-host-serving-the-model")
 
     assert {:ok, %{id: id}} = Router.route("claude-opus-5-5", ctx.client, ctx.config)
     assert id == ctx.big.id
+    assert fired("route-to-the-default-host")
 
     :ok = LLMAgent.Tools.Discovery.unregister(ctx.big.id)
+    :ok = LLMAgent.Tools.Discovery.unregister(tiny.id)
     assert {:error, :no_performer} = Router.route("claude-opus-5-5", ctx.client, ctx.config)
+  end
+
+  defp fired(rule) do
+    [%{event: "HUB_ROUTE", steps: steps, results: results}] =
+      Anemos.Runtime.trace(Rules.runtime(), 1)
+
+    Enum.any?(steps, &(&1.rule == rule and &1.outcome == :fired)) and results != []
   end
 end

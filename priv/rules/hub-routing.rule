@@ -13,14 +13,17 @@
 ;   ?models           what those hosts are serving
 ;
 ; A rule answers with [HUB::route :host "x"] (or :model "y", or :ad_id "z"),
-; or [HUB::refuse :because "..."]. The first answer wins; no answer means
-; the built-in routing decides.
+; or [HUB::refuse :because "..."]. A refusal beats a route; among routes the
+; one the runtime ran first wins, which is the rule loaded last — write
+; rules whose conditions exclude each other, as these two do. No answer
+; means the built-in routing decides. Routing waits one second for the
+; rules: do not call a tool from a HUB_ROUTE rule.
 
 rule route-to-the-host-serving-the-model {
   context "hub" {
     when HUB_ROUTE {
       if ?serving_host != "" {
-        [HUB::route :host ?serving_host]
+        [HUB::route :model ?requested_model]
       }
     }
   }

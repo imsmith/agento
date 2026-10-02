@@ -12,6 +12,7 @@ defmodule Agento.RulesTest do
 
   test "the runtime is up, watching the test directory, with the substrate attached" do
     snapshot = Rules.snapshot()
+    assert snapshot.available
     assert snapshot.dir == Application.get_env(:agento, :rules_dir)
     assert "EVENT" in snapshot.modules
     assert snapshot.tools == []
@@ -59,6 +60,20 @@ defmodule Agento.RulesTest do
 
     File.rm!(path)
     await(fn -> not Enum.any?(Rules.snapshot().policies, &(&1.id == "from-file.rule")) end, 300)
+  end
+
+  test "a runtime that does not answer leaves the snapshot readable" do
+    dispatcher = Process.whereis(:"#{Rules.runtime()}.dispatcher")
+    :sys.suspend(dispatcher)
+
+    try do
+      snapshot = Rules.snapshot()
+      refute snapshot.available
+      assert is_list(snapshot.trace)
+      assert %{unavailable: true} = Rules.explain("ANYTHING", "")
+    after
+      :sys.resume(dispatcher)
+    end
   end
 
   defp await(fun, tries \\ 100) do

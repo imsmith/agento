@@ -38,8 +38,10 @@ defmodule AgentoWeb.RulesLive do
 
   @impl true
   def handle_event("load", %{"policy" => id, "source" => source}, socket) do
+    id = String.trim(id)
+
     socket =
-      case Rules.load(String.trim(id), source) do
+      case deploy(id, source) do
         :ok ->
           socket |> put_flash(:info, "#{id} deployed") |> assign(load_source: "")
 
@@ -59,9 +61,10 @@ defmodule AgentoWeb.RulesLive do
 
   def handle_event("unload", %{"id" => id}, socket) do
     socket =
-      case Rules.unload(id) do
+      case withdraw(id) do
         :ok -> put_flash(socket, :info, "#{id} unloaded")
         {:error, :not_loaded} -> put_flash(socket, :error, "#{id} is not loaded")
+        {:error, reason} -> put_flash(socket, :error, "#{id} not unloaded: #{describe(reason)}")
       end
 
     {:noreply, assign(socket, snapshot: Rules.snapshot())}
@@ -69,12 +72,28 @@ defmodule AgentoWeb.RulesLive do
 
   def handle_event("explain", %{"event" => event, "path" => path}, socket) do
     event = event |> String.trim() |> String.upcase()
+    path = String.trim(path)
 
     explanation =
       if event == "", do: nil, else: Map.put(Rules.explain(event, path), :event, event)
 
     {:noreply, assign(socket, explain_event: event, explain_path: path, explanation: explanation)}
   end
+
+  # The web UI has no login. Deploying a policy is handing the runtime code,
+  # so the hub configuration has to say the UI may; otherwise files only.
+  # Checked here, not in the template alone: the event can be sent without
+  # the form.
+  defp deploy(id, source) do
+    if Rules.ui_deploy?(), do: Rules.load(id, source), else: {:error, :ui_deploy_off}
+  end
+
+  defp withdraw(id) do
+    if Rules.ui_deploy?(), do: Rules.unload(id), else: {:error, :ui_deploy_off}
+  end
+
+  defp describe(:ui_deploy_off),
+    do: "deploying from the UI is off; set :rules {:ui-deploy true} in the hub configuration"
 
   defp describe(reason) when is_binary(reason), do: reason
   defp describe(%{message: message}) when is_binary(message), do: message
@@ -105,8 +124,15 @@ defmodule AgentoWeb.RulesLive do
 
   defp clock(_), do: ""
 
-  defp dom_id(prefix, name),
-    do: prefix <> "-" <> String.replace(to_string(name), ~r/[^A-Za-z0-9]+/, "-")
+  # Readable, and distinct for names that differ only in punctuation.
+  defp dom_id(prefix, name) do
+    name = to_string(name)
+
+    prefix <>
+      "-" <>
+      String.replace(name, ~r/[^A-Za-z0-9]+/, "-") <>
+      "-" <> Integer.to_string(:erlang.phash2(name), 36)
+  end
 
   @impl true
   def render(assigns) do
@@ -118,6 +144,12 @@ defmodule AgentoWeb.RulesLive do
           <span class="text-sm text-base-content/60">
             watching <span class="font-mono">{@snapshot.dir}</span>
           </span>
+        </div>
+
+        <div :if={!@snapshot.available} class="alert alert-warning text-sm" id="runtime-unavailable">
+          <.icon name="hero-exclamation-triangle-mini" class="size-4" />
+          The rules runtime is not answering: it is restarting, or a rule is not finishing.
+          What is shown is the last trace; the rest will fill in when it answers.
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -147,7 +179,7 @@ defmodule AgentoWeb.RulesLive do
                   <td><span class={status_class(p.status)}>{status_text(p.status)}</span></td>
                   <td class="text-right">
                     <button
-                      :if={p.id}
+                      :if={p.id && @snapshot.ui_deploy}
                       phx-click="unload"
                       phx-value-id={p.id}
                       class="btn btn-ghost btn-xs"
@@ -160,7 +192,13 @@ defmodule AgentoWeb.RulesLive do
               </tbody>
             </table>
 
-            <form phx-submit="load" class="space-y-2">
+            <p :if={!@snapshot.ui_deploy} class="text-xs text-base-content/60" id="ui-deploy-off">
+              Deploying from here is off: this UI has no login. Policies come from files in the
+              directory above. To deploy and unload from here, set
+              <span class="font-mono">{":rules {:ui-deploy true}"}</span>
+              in the hub configuration.
+            </p>
+            <form :if={@snapshot.ui_deploy} phx-submit="load" class="space-y-2">
               <h3 class="font-semibold text-xs text-base-content/60">Deploy a policy</h3>
               <input
                 type="text"
@@ -202,7 +240,11 @@ defmodule AgentoWeb.RulesLive do
                 <button type="submit" class="btn btn-sm">Explain</button>
               </form>
               <div :if={@explanation} id="explanation" class="text-xs space-y-1">
-                <p :if={@explanation.rules == [] and @explanation.conditions == []}>
+                <p :if={@explanation[:unavailable]}>The runtime is not answering.</p>
+                <p :if={
+                  !@explanation[:unavailable] and @explanation.rules == [] and
+                    @explanation.conditions == []
+                }>
                   Nothing listens for <span class="font-mono">{@explanation.event}</span>.
                 </p>
                 <p :for={r <- @explanation.rules}>

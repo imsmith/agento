@@ -258,7 +258,12 @@ A rule can call no tool until the hub configuration says which:
 
 That list is the allow list of the policy every tool call from a rule is
 judged by, the same deny-by-default `LLMAgent.Tool.Policy` the hub's
-clients get. Policy text is not trusted with anything it is not given.
+clients get. A rule can always emit onto the event bus and wait on it;
+what it may *call* is what this list gives it.
+
+The Rules view can also deploy and unload policies, but not by default:
+the web UI has no login, and a policy is code. `:rules {:ui-deploy true}`
+turns that on.
 
 ## Architecture
 

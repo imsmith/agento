@@ -130,7 +130,7 @@ defmodule AgentoWeb.HubLiveTest do
     {:ok, view, _html} = live(conn, "/hub")
     summary = turn(%{}) |> Map.drop([:request_body, :response_body])
 
-    LLMAgent.Events.emit(:request, "hub.request", summary, __MODULE__)
+    LLMAgent.Events.emit(:request, "hub.request", summary, AgentoWeb.HubController)
 
     assert eventually(fn -> render(view) =~ summary.requested_model end)
     assert view |> element("#turns tr:first-child", summary.requested_model) |> has_element?()

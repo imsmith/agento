@@ -1,13 +1,54 @@
 defmodule AgentoWeb.RulesLiveTest do
   use AgentoWeb.ConnCase, async: false
 
+  import AgentoWeb.HubCase
+
   alias Agento.Rules
 
   @id "live-test.rule"
 
   setup do
+    install_config(rules_ui_deploy: true)
     on_exit(fn -> Rules.unload(@id) end)
     :ok
+  end
+
+  test "with ui-deploy off, the form is gone and the events are refused", %{conn: conn} do
+    install_config(rules_ui_deploy: false)
+    :ok = Rules.load(@id, ~s|rule a { when EV { log "a" } }|)
+    {:ok, view, html} = live(conn, "/rules")
+
+    assert html =~ "Deploying from here is off"
+    refute has_element?(view, "form[phx-submit=load]")
+    refute has_element?(view, "button[phx-click=unload]")
+
+    html =
+      render_submit(view, "load", %{
+        "policy" => "sneak.rule",
+        "source" => "rule s { when EV { log 1 } }"
+      })
+
+    assert html =~ "deploying from the UI is off"
+    refute Enum.any?(Rules.snapshot().policies, &(&1.id == "sneak.rule"))
+
+    html = render_click(view, "unload", %{"id" => @id})
+    assert html =~ "not unloaded"
+    assert Enum.any?(Rules.snapshot().policies, &(&1.id == @id))
+  end
+
+  test "a forged hub.request from a rule does not reach the Hub view", %{conn: conn} do
+    :ok =
+      Rules.load(
+        @id,
+        ~s|rule forge { when FORGE_TEST { emit [EVENT::forged :client "evil"] to channel(hub.request) } }|
+      )
+
+    {:ok, hub, _} = live(conn, "/hub")
+    LLMAgent.Events.emit(:x, "forge.test", %{}, :test)
+    Process.sleep(200)
+
+    assert Process.alive?(hub.pid)
+    refute render(hub) =~ "evil"
   end
 
   test "mounts, is in the navigation, and names the directory", %{conn: conn} do
@@ -32,7 +73,7 @@ defmodule AgentoWeb.RulesLiveTest do
 
     assert html =~ "#{@id} deployed"
     assert html =~ "count"
-    assert has_element?(view, "#policy-live-test-rule")
+    assert has_element?(view, "[id^=policy-live-test-rule]")
 
     LLMAgent.Events.emit(:tick, "live.test.tick", %{}, :test)
     Process.sleep(100)
@@ -51,7 +92,7 @@ defmodule AgentoWeb.RulesLiveTest do
       |> render_submit()
 
     assert html =~ "#{@id} not deployed"
-    refute has_element?(view, "#policy-live-test-rule")
+    refute has_element?(view, "[id^=policy-live-test-rule]")
   end
 
   test "explains an event", %{conn: conn} do
@@ -77,10 +118,12 @@ defmodule AgentoWeb.RulesLiveTest do
   test "unloads a policy", %{conn: conn} do
     :ok = Rules.load(@id, ~s|rule a { when EV { log "a" } }|)
     {:ok, view, _html} = live(conn, "/rules")
-    assert has_element?(view, "#policy-live-test-rule")
+    assert has_element?(view, "[id^=policy-live-test-rule]")
 
-    html = view |> element("#policy-live-test-rule button[phx-click=unload]") |> render_click()
+    html =
+      view |> element("[id^=policy-live-test-rule] button[phx-click=unload]") |> render_click()
+
     assert html =~ "#{@id} unloaded"
-    refute has_element?(view, "#policy-live-test-rule")
+    refute has_element?(view, "[id^=policy-live-test-rule]")
   end
 end

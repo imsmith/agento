@@ -84,6 +84,14 @@ defmodule Agento.Hub.ConfigTest do
 
       assert {:error, message} = Config.load(write(dir, ~s({:clients [] :rules {:watch "x"}})))
       assert message =~ "unknown key under :rules"
+
+      assert {:error, message} = Config.load(write(dir, ~s({:clients [] :rules {:dir ""}})))
+      assert message =~ "non-empty"
+
+      assert {:ok, config} = Config.load(write(dir, ~s({:clients [] :rules {:ui-deploy true}})))
+      assert config.rules_ui_deploy == true
+      assert {:ok, config} = Config.load(write(dir, "{:clients []}"))
+      assert config.rules_ui_deploy == false
     end
 
     test "a missing file is a config with no clients", %{dir: dir} do

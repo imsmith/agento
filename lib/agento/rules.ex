@@ -39,20 +39,58 @@ defmodule Agento.Rules do
   @doc false
   def attachment_spec, do: {LLMAgent.Anemos, runtime: @runtime, policy: policy()}
 
-  @doc "Everything loaded, with its state, the last dispatches, and what a rule could call."
+  @doc "Whether the Rules view may deploy and unload policies (`:rules {:ui-deploy true}`)."
+  @spec ui_deploy?() :: boolean()
+  def ui_deploy?, do: Config.get().rules_ui_deploy
+
+  @doc """
+  Everything loaded, with its state, the last dispatches, and what a rule
+  could call.
+
+  A runtime that does not answer — restarting, or wedged by a rule that
+  never finishes — gives `available: false` and whatever can still be read:
+  the trace lives in a table the dispatcher does not hold.
+  """
   @spec snapshot() :: map()
   def snapshot do
-    description = Anemos.Runtime.describe(@runtime)
-    status = watcher_status()
+    config = Config.get()
 
-    description
-    |> Map.put(:dir, dir())
-    |> Map.put(:tools, Config.get().rules_tools)
-    |> Map.put(:verbs, LLMAgent.Anemos.verbs())
-    |> Map.put(:trace, Anemos.Runtime.trace(@runtime, 50))
-    |> Map.update!(:policies, fn policies ->
-      Enum.map(policies, &Map.put(&1, :status, Map.get(status, &1.id)))
-    end)
+    base = %{
+      available: true,
+      dir: dir(),
+      tools: config.rules_tools,
+      ui_deploy: config.rules_ui_deploy,
+      verbs: LLMAgent.Anemos.verbs(),
+      trace: Anemos.Runtime.trace(@runtime, 50),
+      policies: [],
+      rules: [],
+      conditions: [],
+      capabilities: [],
+      schedules: [],
+      modules: []
+    }
+
+    case describe() do
+      {:ok, description} ->
+        status = watcher_status()
+
+        base
+        |> Map.merge(description)
+        |> Map.update!(:policies, fn policies ->
+          Enum.map(policies, &Map.put(&1, :status, Map.get(status, &1.id)))
+        end)
+
+      :unavailable ->
+        %{base | available: false}
+    end
+  end
+
+  # Shorter than the default call timeout: a view refreshing every two
+  # seconds must not queue behind a dispatcher that is busy.
+  defp describe do
+    {:ok, Anemos.Runtime.describe(@runtime, timeout: 1_500)}
+  catch
+    :exit, _ -> :unavailable
   end
 
   @doc "Deploy `source` as the policy `id`, over whatever was loaded under it."
@@ -66,8 +104,13 @@ defmodule Agento.Rules do
 
   @doc "What dispatching `event` with `context_path` would do, without doing it."
   @spec explain(String.t(), String.t() | nil) :: %{rules: [map()], conditions: [String.t()]}
-  def explain(event, context_path),
-    do: Anemos.Runtime.explain(@runtime, event, %{context_path: blank_to_nil(context_path)})
+  def explain(event, context_path) do
+    Anemos.Runtime.explain(@runtime, event, %{context_path: blank_to_nil(context_path)},
+      timeout: 1_500
+    )
+  catch
+    :exit, _ -> %{rules: [], conditions: [], unavailable: true}
+  end
 
   defp blank_to_nil(""), do: nil
   defp blank_to_nil(path), do: path

@@ -11,13 +11,25 @@ defmodule AgentoWeb.HubModelsTest do
     {:ok, conn: put_req_header(conn, "authorization", "Bearer #{token()}")}
   end
 
-  test "lists reachable models in Anthropic's shape when asked with anthropic-version", %{conn: conn} do
+  test "lists reachable models in Anthropic's shape when asked with anthropic-version", %{
+    conn: conn
+  } do
     register(host: "big.local", model: "big.gguf")
     register(host: "small.local", model: "small.gguf")
 
-    body = conn |> put_req_header("anthropic-version", "2023-06-01") |> get("/v1/models") |> json_response(200)
+    body =
+      conn
+      |> put_req_header("anthropic-version", "2023-06-01")
+      |> get("/v1/models")
+      |> json_response(200)
 
-    assert %{"has_more" => false, "first_id" => "big.gguf", "last_id" => "small.gguf", "data" => data} = body
+    assert %{
+             "has_more" => false,
+             "first_id" => "big.gguf",
+             "last_id" => "small.gguf",
+             "data" => data
+           } = body
+
     assert Enum.map(data, & &1["id"]) == ["big.gguf", "small.gguf"]
 
     for entry <- data do
@@ -30,7 +42,10 @@ defmodule AgentoWeb.HubModelsTest do
   test "lists them in OpenAI's shape otherwise", %{conn: conn} do
     register(host: "big.local", model: "big.gguf")
 
-    assert %{"object" => "list", "data" => [%{"id" => "big.gguf", "object" => "model", "owned_by" => owner}]} =
+    assert %{
+             "object" => "list",
+             "data" => [%{"id" => "big.gguf", "object" => "model", "owned_by" => owner}]
+           } =
              conn |> get("/v1/models") |> json_response(200)
 
     assert is_binary(owner)
@@ -38,7 +53,10 @@ defmodule AgentoWeb.HubModelsTest do
 
   test "an empty registry is an empty list, not an error", %{conn: conn} do
     assert %{"data" => [], "has_more" => false, "first_id" => nil, "last_id" => nil} =
-             conn |> put_req_header("anthropic-version", "2023-06-01") |> get("/v1/models") |> json_response(200)
+             conn
+             |> put_req_header("anthropic-version", "2023-06-01")
+             |> get("/v1/models")
+             |> json_response(200)
 
     assert %{"object" => "list", "data" => []} = conn |> get("/v1/models") |> json_response(200)
   end

@@ -41,7 +41,13 @@ defmodule AgentoWeb.HubController do
   # client and the performer said goes to the turn log and nowhere else.
   defp record(summary) do
     TurnLog.record(summary)
-    LLMAgent.Events.emit(:request, "hub.request", Map.drop(summary, [:request_body, :response_body]), __MODULE__)
+
+    LLMAgent.Events.emit(
+      :request,
+      "hub.request",
+      Map.drop(summary, [:request_body, :response_body]),
+      __MODULE__
+    )
   end
 
   defp error(conn, status, message) do
@@ -66,7 +72,11 @@ defmodule AgentoWeb.HubController do
     now = DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
 
     %{
-      "data" => for(id <- ids, do: %{"type" => "model", "id" => id, "display_name" => id, "created_at" => now}),
+      "data" =>
+        for(
+          id <- ids,
+          do: %{"type" => "model", "id" => id, "display_name" => id, "created_at" => now}
+        ),
       "has_more" => false,
       "first_id" => List.first(ids),
       "last_id" => List.last(ids)
@@ -74,6 +84,9 @@ defmodule AgentoWeb.HubController do
   end
 
   defp openai_models(ids) do
-    %{"object" => "list", "data" => for(id <- ids, do: %{"id" => id, "object" => "model", "owned_by" => "agento"})}
+    %{
+      "object" => "list",
+      "data" => for(id <- ids, do: %{"id" => id, "object" => "model", "owned_by" => "agento"})
+    }
   end
 end

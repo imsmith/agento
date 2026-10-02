@@ -47,8 +47,22 @@ if tclsh = config_env() != :test && System.find_executable("tclsh") do
   ]
 end
 
+# The listener binds loopback unless AGENTO_BIND says otherwise. The hub's
+# clients are on this machine; reaching it from elsewhere is a decision, not
+# a default.
+bind =
+  case System.get_env("AGENTO_BIND", "127.0.0.1") |> String.to_charlist() |> :inet.parse_address() do
+    {:ok, ip} ->
+      ip
+
+    {:error, _} ->
+      raise "AGENTO_BIND must be an IP address, got #{inspect(System.get_env("AGENTO_BIND"))}"
+  end
+
+default_port = if config_env() == :prod, do: "4141", else: "0"
+
 config :agento, AgentoWeb.Endpoint,
-  http: [port: String.to_integer(System.get_env("PORT", "0"))]
+  http: [ip: bind, port: String.to_integer(System.get_env("PORT", default_port))]
 
 if config_env() == :prod do
   # The secret key base is used to sign/encrypt cookies and other secrets.
@@ -67,15 +81,9 @@ if config_env() == :prod do
 
   config :agento, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
+  # The bind address and port are set above, for every environment.
   config :agento, AgentoWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
-    http: [
-      # Enable IPv6 and bind on all interfaces.
-      # Set it to  {0, 0, 0, 0, 0, 0, 0, 1} for local network only access.
-      # See the documentation on https://hexdocs.pm/bandit/Bandit.html#t:options/0
-      # for details about using IPv6 vs IPv4 and loopback vs public addresses.
-      ip: {0, 0, 0, 0, 0, 0, 0, 0}
-    ],
     secret_key_base: secret_key_base
 
   # ## SSL Support

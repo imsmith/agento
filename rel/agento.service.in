@@ -1,0 +1,16 @@
+[Unit]
+Description=agento - private LLM hub
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+EnvironmentFile=@CONFIG_DIR@/env
+WorkingDirectory=@DATA_DIR@
+ExecStart=@RELEASE_DIR@/bin/agento start
+ExecStop=@RELEASE_DIR@/bin/agento stop
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

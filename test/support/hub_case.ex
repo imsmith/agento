@@ -63,7 +63,9 @@ defmodule AgentoWeb.HubCase do
       id: Keyword.get(opts, :id, "mdns:_llama._tcp:#{host}:8080"),
       coordinate: "compute.llm.chat",
       kinds: [:generate],
-      binding: {:openai_chat, %{api_host: Keyword.get(opts, :api_host, "http://10.0.0.1:8080"), model: model}},
+      binding:
+        {:openai_chat,
+         %{api_host: Keyword.get(opts, :api_host, "http://10.0.0.1:8080"), model: model}},
       operational: %{actions: %{"chat" => %{concurrency: 4}}, model_id: model},
       constraint: %{idempotency: %{}, blast_radius: %{}},
       affordance: %{declared: [%{intent: :long_context, n_ctx: 32_768}], learned: [], open: true},

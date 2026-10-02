@@ -30,7 +30,8 @@ defmodule Agento.Hub.Router do
   @type model_entry :: %{id: String.t(), ad_id: String.t()}
 
   @doc "The ad that should serve `requested_model` for `client`."
-  @spec route(String.t() | nil, Config.client(), Config.t()) :: {:ok, ToolAd.t()} | {:error, :no_performer}
+  @spec route(String.t() | nil, Config.client(), Config.t()) ::
+          {:ok, ToolAd.t()} | {:error, :no_performer}
   def route(requested_model, client, %Config{default_host: default_host}) do
     candidates = candidates(client)
 
@@ -78,6 +79,8 @@ defmodule Agento.Hub.Router do
 
   defp mdns_host(_id), do: nil
 
-  defp api_hostname({_kind, %{api_host: api_host}}) when is_binary(api_host), do: URI.parse(api_host).host
+  defp api_hostname({_kind, %{api_host: api_host}}) when is_binary(api_host),
+    do: URI.parse(api_host).host
+
   defp api_hostname(_binding), do: nil
 end

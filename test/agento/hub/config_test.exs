@@ -56,7 +56,9 @@ defmodule Agento.Hub.ConfigTest do
     end
 
     test "explicit values override the defaults", %{dir: dir} do
-      edn = ~s({:clients [] :retention-days 7 :performer-timeout-seconds 60 :data-dir "/tmp/hub-data"})
+      edn =
+        ~s({:clients [] :retention-days 7 :performer-timeout-seconds 60 :data-dir "/tmp/hub-data"})
+
       assert {:ok, config} = Config.load(write(dir, edn))
 
       assert config.retention_days == 7
@@ -66,7 +68,8 @@ defmodule Agento.Hub.ConfigTest do
     end
 
     test "a missing file is a config with no clients", %{dir: dir} do
-      assert {:ok, %Config{clients: [], retention_days: 30}} = Config.load(Path.join(dir, "absent.edn"))
+      assert {:ok, %Config{clients: [], retention_days: 30}} =
+               Config.load(Path.join(dir, "absent.edn"))
     end
 
     test "every client is pinned to local mDNS performers", %{dir: dir} do
@@ -77,7 +80,9 @@ defmodule Agento.Hub.ConfigTest do
         assert client.policy.provenance == %{source: ["mdns/_llama._tcp"], signed: false}
 
         assert :ok = Policy.decide(client.policy, ad("mdns/_llama._tcp"), :generate, "chat")
-        assert {:error, :forbidden, :provenance} = Policy.decide(client.policy, ad("hub.config"), :generate, "chat")
+
+        assert {:error, :forbidden, :provenance} =
+                 Policy.decide(client.policy, ad("hub.config"), :generate, "chat")
       end
     end
 
@@ -104,8 +109,10 @@ defmodule Agento.Hub.ConfigTest do
         {~s({:clients [{:token "#{@token_a}"}]}), "name"},
         {~s({:clients [{:name "short" :token "tooshort"}]}), "short"},
         {~s({:clients [{:name "nameonly"}]}), "nameonly"},
-        {~s({:clients [{:name "a" :token "#{@token_a}"} {:name "b" :token "#{@token_a}"}]}), "token"},
-        {~s({:clients [{:name "dup" :token "#{@token_a}"} {:name "dup" :token "#{@token_b}"}]}), "dup"},
+        {~s({:clients [{:name "a" :token "#{@token_a}"} {:name "b" :token "#{@token_a}"}]}),
+         "token"},
+        {~s({:clients [{:name "dup" :token "#{@token_a}"} {:name "dup" :token "#{@token_b}"}]}),
+         "dup"},
         {~s({:clients [{:name "cloudy" :token "#{@token_a}" :cloud true}]}), "cloud"},
         {~s({:clients [{:name "odd" :token "#{@token_a}" :admin true}]}), "admin"},
         {~s({:clients "nope"}), "clients"}

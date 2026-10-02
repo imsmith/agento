@@ -38,7 +38,13 @@ defmodule Agento.Hub.Config do
 
   @local_sources ["mdns/_llama._tcp"]
   @min_token_bytes 16
-  @known_keys [:clients, :"default-host", :"retention-days", :"performer-timeout-seconds", :"data-dir"]
+  @known_keys [
+    :clients,
+    :"default-host",
+    :"retention-days",
+    :"performer-timeout-seconds",
+    :"data-dir"
+  ]
   @client_keys [:name, :token, :cloud]
 
   @enforce_keys [:clients, :default_host, :retention_days, :performer_timeout_ms, :data_dir]
@@ -94,9 +100,14 @@ defmodule Agento.Hub.Config do
          {:ok, %{} = edn} when not is_struct(edn) <- EDN.decode(text) do
       build(edn)
     else
-      {:ok, _not_a_map} -> {:error, "#{path}: the top level must be an edn map"}
-      {:error, %{__exception__: true} = error} -> {:error, "#{path}: malformed edn: #{Exception.message(error)}"}
-      {:error, reason} -> {:error, "cannot read #{path}: #{inspect(reason)}"}
+      {:ok, _not_a_map} ->
+        {:error, "#{path}: the top level must be an edn map"}
+
+      {:error, %{__exception__: true} = error} ->
+        {:error, "#{path}: malformed edn: #{Exception.message(error)}"}
+
+      {:error, reason} ->
+        {:error, "cannot read #{path}: #{inspect(reason)}"}
     end
   end
 
@@ -145,7 +156,10 @@ defmodule Agento.Hub.Config do
   defp clients(list) when is_list(list) do
     with {:ok, clients} <- each_client(list, []),
          :ok <- unique(clients, :name, fn name -> "two clients are named #{inspect(name)}" end),
-         :ok <- unique(clients, :token, fn _token -> "two clients share a token; each client needs its own" end) do
+         :ok <-
+           unique(clients, :token, fn _token ->
+             "two clients share a token; each client needs its own"
+           end) do
       {:ok, clients}
     end
   end
@@ -166,14 +180,16 @@ defmodule Agento.Hub.Config do
 
     cond do
       Map.keys(record) -- @client_keys != [] ->
-        {:error, "client #{inspect(name)}: unknown key #{inspect(hd(Map.keys(record) -- @client_keys))}"}
+        {:error,
+         "client #{inspect(name)}: unknown key #{inspect(hd(Map.keys(record) -- @client_keys))}"}
 
       Map.get(record, :cloud, false) != false ->
         {:error,
          "client #{inspect(name)}: cloud forwarding is not available in this build; remove :cloud or set it to false"}
 
       not is_binary(token) or byte_size(token) < @min_token_bytes ->
-        {:error, "client #{inspect(name)}: token must be a string of at least #{@min_token_bytes} characters"}
+        {:error,
+         "client #{inspect(name)}: token must be a string of at least #{@min_token_bytes} characters"}
 
       true ->
         {:ok, %{name: name, token: token, policy: local_policy()}}
@@ -204,7 +220,8 @@ defmodule Agento.Hub.Config do
   time, so how long this takes says nothing about which token came close.
   """
   @spec client_for_token(t(), String.t() | nil) :: {:ok, client()} | :error
-  def client_for_token(%__MODULE__{clients: clients}, token) when is_binary(token) and token != "" do
+  def client_for_token(%__MODULE__{clients: clients}, token)
+      when is_binary(token) and token != "" do
     clients
     |> Enum.filter(&Plug.Crypto.secure_compare(&1.token, token))
     |> case do

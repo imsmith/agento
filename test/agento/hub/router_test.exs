@@ -58,7 +58,12 @@ defmodule Agento.Hub.RouterTest do
   end
 
   test "an ad the client's policy does not admit is never routed to or listed", ctx do
-    register(id: "cloud.1", api_host: "http://big.local:1", model: "paid.gguf", source: "hub.config")
+    register(
+      id: "cloud.1",
+      api_host: "http://big.local:1",
+      model: "paid.gguf",
+      source: "hub.config"
+    )
 
     assert {:error, :no_performer} = Router.route("paid.gguf", ctx.client, ctx.config)
     assert {:error, :no_performer} = Router.route("unknown", ctx.client, ctx.config)
@@ -71,7 +76,9 @@ defmodule Agento.Hub.RouterTest do
     :ok = Discovery.update(llama_ad(host: "big.local", model: "new.gguf"))
 
     assert Enum.map(Router.models(ctx.client), & &1.id) == ["new.gguf", "small.gguf"]
-    assert {:ok, %{id: "mdns:_llama._tcp:big.local:8080"}} = Router.route("new.gguf", ctx.client, ctx.config)
+
+    assert {:ok, %{id: "mdns:_llama._tcp:big.local:8080"}} =
+             Router.route("new.gguf", ctx.client, ctx.config)
 
     # The old name is now just an unknown model: it falls to the default host.
     assert {:ok, ad} = Router.route("old.gguf", ctx.client, ctx.config)

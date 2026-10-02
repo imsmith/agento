@@ -79,6 +79,115 @@ LLMAGENT_API_HOST=http://10.10.1.226:8080/v1 \
 PORT=4000 mix phx.server
 ```
 
+## Private LLM hub
+
+Agento can run as a long-lived local service that coding clients point at
+instead of a vendor: it speaks Anthropic's Messages protocol on
+`POST /v1/messages`, and serves each turn from whichever llama host is
+advertising on the network. Every turn goes through
+`LLMAgent.Tool.Dispatcher.generate` under a per-client policy, and is
+recorded.
+
+```text
+Claude Code --Messages/SSE--> agento /v1/messages
+                                 | token -> client -> policy
+                                 | router -> a discovered compute.llm.chat ad
+                                 v
+                    Dispatcher.generate --OpenAI Chat--> llama-server
+```
+
+### Install
+
+```bash
+tclsh scripts/install-service.tcl --default-host skynet001.local
+```
+
+This builds a release under `~/.local/lib/agento`, and writes
+`~/.config/agento/hub.edn` (clients and routing), `~/.config/agento/env`
+(the unit's environment) and `~/.config/systemd/user/agento.service`. The
+two files under `~/.config/agento` hold secrets, are mode 0600, and are never
+overwritten by a later run. `--prefix DIR` installs under another root,
+`--port N` picks the port (default 4141), `--dry-run` shows what it would do.
+
+It does not start anything. To run the hub now and at every login:
+
+```bash
+systemctl --user daemon-reload
+systemctl --user enable --now agento
+systemctl --user status agento
+```
+
+### Point a client at it
+
+The installer prints both lines with the generated token:
+
+```bash
+export ANTHROPIC_BASE_URL=http://127.0.0.1:4141
+export ANTHROPIC_AUTH_TOKEN=<the token in ~/.config/agento/hub.edn>
+claude
+```
+
+With those set, Claude Code talks only to the hub. That session does not use
+a Claude subscription, and this build of the hub never forwards to a paid
+API: every client's policy admits local mDNS-discovered performers and
+nothing else. Unset the two variables to go back to the vendor.
+
+Each program that connects should be its own client with its own token; add
+entries to `:clients` in `hub.edn` and restart the unit.
+`priv/hub.example.edn` documents every key.
+
+`pi` should work the same way through a custom provider in
+`~/.pi/agent/models.json`. This has not been tested:
+
+```text
+{"providers": {"agento": {"baseUrl": "http://127.0.0.1:4141",
+                          "api": "anthropic-messages",
+                          "apiKey": "<a client token from hub.edn>",
+                          "models": [{"id": "local"}]}}}
+```
+
+### What to expect
+
+- **Routing.** A request for a model some host is serving goes to that host.
+  Anything else, which includes every model name Claude Code uses, goes to
+  `:default-host`. The default names a host, never a model: the hub uses
+  whatever that host is serving when the turn arrives. With no default host,
+  such requests get a 404. `GET /v1/models` lists what is reachable now.
+- **The first turn is slow.** Claude Code's opening request is around 18,000
+  tokens. A llama host takes a minute or two to read it before the first
+  byte; later turns in the session reuse the cached prompt and answer in
+  seconds. `:performer-timeout-seconds` (default 900) is how long the hub
+  waits.
+- **Model quality is the model's.** The hub carries tool calls faithfully. A
+  small local model may still handle Claude Code's tool set poorly.
+
+### Where things are
+
+| What | Where |
+| --- | --- |
+| Clients, default host, retention | `~/.config/agento/hub.edn` |
+| Port, bind address, secrets | `~/.config/agento/env` |
+| Turn log (SQLite) | `~/.local/share/agento/hub_turns.sqlite` |
+| Service log | `journalctl --user -u agento` |
+| Live traffic | the Events view, topic `hub.request` |
+
+The turn log has one row per turn: client, requested model, performer,
+outcome, token counts, duration, and the request and reply exactly as they
+crossed the wire. It therefore contains whatever was typed into a prompt. It
+is readable by its owner only, and rows older than `:retention-days`
+(default 30) are deleted. The `hub.request` events carry the same facts
+without either body.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `AGENTO_BIND` | `127.0.0.1` | Address the listener binds. Loopback unless you decide otherwise. |
+| `AGENTO_HUB_CONFIG` | `~/.config/agento/hub.edn` | Hub configuration file. |
+| `PORT` | `4141` in a release | HTTP listen port. |
+
+A hub configuration that cannot be trusted stops agento at boot with a
+message saying why: a file readable by anyone but its owner, malformed edn,
+two clients sharing a token, an unknown key.
+
 ## Architecture
 
 - **`AgentoWeb.Discovery.*`** — the boundary layer. `Agents`, `Endpoints`,
@@ -101,3 +210,12 @@ mix test
 Integration tests run against the live LLMAgent supervision tree with a
 `TestLLMClient` (no mocking of agent internals). Discovery-driven behaviour is
 covered by registering fake `compute.llm.chat` ads as the discovery source.
+
+The hub is tested against a fake performer serving streams recorded from the
+live llama-servers, with request bodies captured from a real Claude Code
+client (both live in llmagent's `test/fixtures/wire/`). The install script
+has its own suite:
+
+```bash
+tclsh test/tcl/install_service_test.tcl
+```

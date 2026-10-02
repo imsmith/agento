@@ -67,7 +67,8 @@ defmodule AgentoWeb.Hub.Turn do
         }
 
   @doc "Run `turn` against `ad` for `client`, replying on `conn`."
-  @spec run(Plug.Conn.t(), Turn.t(), ToolAd.t(), Config.client(), Config.t()) :: {Plug.Conn.t(), summary()}
+  @spec run(Plug.Conn.t(), Turn.t(), ToolAd.t(), Config.client(), Config.t()) ::
+          {Plug.Conn.t(), summary()}
   def run(conn, %Turn{} = turn, %ToolAd{} = ad, client, %Config{} = config) do
     started = System.monotonic_time(:millisecond)
     at = now()
@@ -195,9 +196,11 @@ defmodule AgentoWeb.Hub.Turn do
 
   # --- turning the dispatcher's result into the end of the response ---
 
-  defp conclude(%{aborted: true} = state, _result, _turn), do: {state.conn, "aborted", "client disconnected"}
+  defp conclude(%{aborted: true} = state, _result, _turn),
+    do: {state.conn, "aborted", "client disconnected"}
 
-  defp conclude(%{started: true} = state, {:ok, _message, _provenance}, _turn), do: {state.conn, "ok", nil}
+  defp conclude(%{started: true} = state, {:ok, _message, _provenance}, _turn),
+    do: {state.conn, "ok", nil}
 
   # The stream is open and the performer failed. Usually the error frame went
   # out when the error event arrived; a failure that produced no event gets
@@ -218,34 +221,49 @@ defmodule AgentoWeb.Hub.Turn do
   defp conclude(state, error, _turn) do
     reason = reason(error)
     {status, message} = status_for(reason)
-    {send_json(state.conn, status, Anthropic.encode_error(status, message)), "error", describe(reason)}
+
+    {send_json(state.conn, status, Anthropic.encode_error(status, message)), "error",
+     describe(reason)}
   end
 
   defp reason({:error, :forbidden, why}), do: {:forbidden, why}
   defp reason({:error, reason}), do: reason
   defp reason(other), do: other
 
-  defp status_for({:forbidden, _why}), do: {403, "this client's policy does not permit that performer"}
+  defp status_for({:forbidden, _why}),
+    do: {403, "this client's policy does not permit that performer"}
 
   defp status_for({:http_error, status, body}),
     do: {502, "the performer answered #{status}: #{performer_message(body)}"}
 
   defp status_for(%{reason: :timeout}), do: {504, "the performer timed out before replying"}
-  defp status_for(:incomplete_stream), do: {502, "the performer ended its reply without finishing"}
-  defp status_for(%{__exception__: true} = error), do: {502, "the performer could not be reached: #{Exception.message(error)}"}
+
+  defp status_for(:incomplete_stream),
+    do: {502, "the performer ended its reply without finishing"}
+
+  defp status_for(%{__exception__: true} = error),
+    do: {502, "the performer could not be reached: #{Exception.message(error)}"}
+
   defp status_for(_other), do: {502, "the performer failed"}
 
-  defp performer_message(%{"error" => %{"message" => message}}) when is_binary(message), do: String.slice(message, 0, 500)
+  defp performer_message(%{"error" => %{"message" => message}}) when is_binary(message),
+    do: String.slice(message, 0, 500)
+
   defp performer_message(body) when is_binary(body), do: String.slice(body, 0, 500)
   defp performer_message(_body), do: "no message"
 
   # What the turn log keeps: short, and free of internal structure.
   defp describe({:forbidden, why}), do: "forbidden: #{why}"
-  defp describe({:http_error, status, body}), do: "performer answered #{status}: #{performer_message(body)}"
+
+  defp describe({:http_error, status, body}),
+    do: "performer answered #{status}: #{performer_message(body)}"
+
   defp describe(%{__exception__: true} = error), do: Exception.message(error)
   defp describe(reason) when is_atom(reason), do: Atom.to_string(reason)
   defp describe(reason) when is_binary(reason), do: reason
-  defp describe(reason), do: reason |> inspect(limit: 5, printable_limit: 200) |> String.slice(0, 300)
+
+  defp describe(reason),
+    do: reason |> inspect(limit: 5, printable_limit: 200) |> String.slice(0, 300)
 
   defp send_json(conn, status, body) do
     conn

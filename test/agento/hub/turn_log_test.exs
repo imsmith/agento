@@ -42,7 +42,8 @@ defmodule Agento.Hub.TurnLogTest do
     )
   end
 
-  defp days_ago(days), do: DateTime.utc_now() |> DateTime.add(-days * 86_400) |> DateTime.to_iso8601()
+  defp days_ago(days),
+    do: DateTime.utc_now() |> DateTime.add(-days * 86_400) |> DateTime.to_iso8601()
 
   defp mode(path), do: File.stat!(path).mode &&& 0o777
 
@@ -58,8 +59,18 @@ defmodule Agento.Hub.TurnLogTest do
 
   test "absent values stay absent", %{dir: dir} do
     log = start(dir)
-    refused = row(%{ad_id: nil, performer_model: nil, stop_reason: nil, input_tokens: nil, output_tokens: nil,
-                    outcome: "error", error: "no performer", response_body: nil})
+
+    refused =
+      row(%{
+        ad_id: nil,
+        performer_model: nil,
+        stop_reason: nil,
+        input_tokens: nil,
+        output_tokens: nil,
+        outcome: "error",
+        error: "no performer",
+        response_body: nil
+      })
 
     TurnLog.record(refused, log)
     assert [stored] = TurnLog.recent(10, log)
@@ -109,7 +120,10 @@ defmodule Agento.Hub.TurnLogTest do
         do: TurnLog.record(row(%{at: days_ago(days), requested_model: model}), log)
 
     assert {:ok, 1} = TurnLog.prune(DateTime.utc_now(), log)
-    assert Enum.map(TurnLog.recent(10, log), & &1.requested_model) |> Enum.sort() == ~w(now recent)
+
+    assert Enum.map(TurnLog.recent(10, log), & &1.requested_model) |> Enum.sort() ==
+             ~w(now recent)
+
     assert {:ok, 0} = TurnLog.prune(DateTime.utc_now(), log)
   end
 

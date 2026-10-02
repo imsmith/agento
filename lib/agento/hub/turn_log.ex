@@ -81,7 +81,8 @@ defmodule Agento.Hub.TurnLog do
 
   @doc "Record a turn. Always `:ok`; never blocks, never raises."
   @spec record(row(), server()) :: :ok
-  def record(row, server \\ __MODULE__) when is_map(row), do: GenServer.cast(server, {:record, row})
+  def record(row, server \\ __MODULE__) when is_map(row),
+    do: GenServer.cast(server, {:record, row})
 
   @doc "The most recent turns, newest first."
   @spec recent(pos_integer(), server()) :: [row()]
@@ -96,7 +97,11 @@ defmodule Agento.Hub.TurnLog do
 
   @impl true
   def init(opts) do
-    state = %{db: open(Keyword.fetch!(opts, :data_dir)), retention_days: Keyword.get(opts, :retention_days, 30)}
+    state = %{
+      db: open(Keyword.fetch!(opts, :data_dir)),
+      retention_days: Keyword.get(opts, :retention_days, 30)
+    }
+
     {_count, state} = do_prune(state, DateTime.utc_now())
     Process.send_after(self(), :prune, @prune_every_ms)
     {:ok, state}
@@ -107,8 +112,11 @@ defmodule Agento.Hub.TurnLog do
 
   def handle_cast({:record, row}, state) do
     case insert(state.db, row) do
-      :ok -> :ok
-      {:error, reason} -> Logger.error("turn log: could not record a turn, dropping it: #{inspect(reason)}")
+      :ok ->
+        :ok
+
+      {:error, reason} ->
+        Logger.error("turn log: could not record a turn, dropping it: #{inspect(reason)}")
     end
 
     {:noreply, state}
@@ -161,7 +169,10 @@ defmodule Agento.Hub.TurnLog do
       db
     else
       error ->
-        Logger.error("turn log: cannot use #{path}, turns will not be recorded: #{inspect(error)}")
+        Logger.error(
+          "turn log: cannot use #{path}, turns will not be recorded: #{inspect(error)}"
+        )
+
         nil
     end
   end

@@ -28,9 +28,14 @@ defmodule AgentoWeb.HubLive do
     {:ok, assign(socket, active_nav: :hub, status: Status.snapshot(), turns: recent_turns())}
   end
 
+  # Only what the hub itself recorded. A rule can emit on any topic, this
+  # one included; its events carry its own source and another shape.
   @impl true
-  def handle_info({"hub.request", event}, socket) do
-    turns = Enum.take([event.data | socket.assigns.turns], @max_turns)
+  def handle_info(
+        {"hub.request", %{source: AgentoWeb.HubController, data: %{at: _} = turn}},
+        socket
+      ) do
+    turns = Enum.take([turn | socket.assigns.turns], @max_turns)
     {:noreply, assign(socket, turns: turns)}
   end
 

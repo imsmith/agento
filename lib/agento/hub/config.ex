@@ -10,7 +10,8 @@ defmodule Agento.Hub.Config do
        :default-host "skynet001.local"
        :retention-days 30
        :performer-timeout-seconds 900
-       :data-dir "~/.local/share/agento"}
+       :data-dir "~/.local/share/agento"
+       :rules {:dir "~/.config/agento/rules" :tools ["resource.*"] :ui-deploy false}}
 
   The file holds bearer tokens, so one that anyone but its owner can read is
   refused. A missing file is not an error: the hub then has no clients and
@@ -43,12 +44,32 @@ defmodule Agento.Hub.Config do
     :"default-host",
     :"retention-days",
     :"performer-timeout-seconds",
-    :"data-dir"
+    :"data-dir",
+    :rules
   ]
+  @rules_keys [:dir, :tools, :"ui-deploy"]
   @client_keys [:name, :token, :cloud]
 
-  @enforce_keys [:clients, :default_host, :retention_days, :performer_timeout_ms, :data_dir]
-  defstruct [:clients, :default_host, :retention_days, :performer_timeout_ms, :data_dir]
+  @enforce_keys [
+    :clients,
+    :default_host,
+    :retention_days,
+    :performer_timeout_ms,
+    :data_dir,
+    :rules_dir,
+    :rules_tools,
+    :rules_ui_deploy
+  ]
+  defstruct [
+    :clients,
+    :default_host,
+    :retention_days,
+    :performer_timeout_ms,
+    :data_dir,
+    :rules_dir,
+    :rules_tools,
+    :rules_ui_deploy
+  ]
 
   @type client :: %{name: String.t(), token: String.t(), policy: Policy.t()}
 
@@ -57,7 +78,10 @@ defmodule Agento.Hub.Config do
           default_host: String.t() | nil,
           retention_days: pos_integer(),
           performer_timeout_ms: pos_integer(),
-          data_dir: String.t()
+          data_dir: String.t(),
+          rules_dir: String.t(),
+          rules_tools: [String.t()],
+          rules_ui_deploy: boolean()
         }
 
   @doc "Where the configuration is read from."
@@ -117,17 +141,55 @@ defmodule Agento.Hub.Config do
          {:ok, default_host} <- optional_string(edn, :"default-host"),
          {:ok, retention} <- positive_integer(edn, :"retention-days", 30),
          {:ok, timeout} <- positive_integer(edn, :"performer-timeout-seconds", 900),
-         {:ok, data_dir} <- optional_string(edn, :"data-dir") do
+         {:ok, data_dir} <- optional_string(edn, :"data-dir"),
+         {:ok, rules_dir, rules_tools, ui_deploy} <- rules(Map.get(edn, :rules, %{})) do
       {:ok,
        %__MODULE__{
          clients: clients,
          default_host: default_host,
          retention_days: retention,
          performer_timeout_ms: timeout * 1_000,
-         data_dir: Path.expand(data_dir || "~/.local/share/agento")
+         data_dir: Path.expand(data_dir || "~/.local/share/agento"),
+         rules_dir: Path.expand(rules_dir || "~/.config/agento/rules"),
+         rules_tools: rules_tools,
+         rules_ui_deploy: ui_deploy
        }}
     end
   end
+
+  # `:rules {:dir "..." :tools ["resource.*"] :ui-deploy false}`. The tools
+  # list is the allow list of the policy every rule's tool call is judged
+  # by; empty, the default, means a rule can call no tool at all. Tool
+  # rights are opted into here, by coordinate pattern, like a client's
+  # reach. `:ui-deploy` lets the Rules view deploy and unload policies; the
+  # web UI has no login, so by default only files in `:dir` can.
+  defp rules(%{} = map) when not is_struct(map) do
+    with :ok <- known_keys(map, @rules_keys, "key under :rules"),
+         {:ok, dir} <- optional_string(map, :dir),
+         {:ok, tools} <- patterns(Map.get(map, :tools, [])),
+         {:ok, ui_deploy} <- boolean(map, :"ui-deploy", false) do
+      {:ok, dir, tools, ui_deploy}
+    end
+  end
+end
+
+defp rules(_other), do: {:error, "rules must be a map"}
+
+defp boolean(map, key, default) do
+  case Map.get(map, key, default) do
+    value when is_boolean(value) -> {:ok, value}
+    _ -> {:error, "#{key} must be true or false"}
+  end
+
+  defp patterns(%EDN.Vector{} = vector), do: patterns(Enum.to_list(vector))
+
+  defp patterns(list) when is_list(list) do
+    if Enum.all?(list, &(is_binary(&1) and &1 != "")),
+      do: {:ok, list},
+      else: {:error, "rules :tools must be a vector of coordinate patterns"}
+  end
+
+  defp patterns(_other), do: {:error, "rules :tools must be a vector of coordinate patterns"}
 
   defp known_keys(map, known, what) do
     case Map.keys(map) -- known do
@@ -136,11 +198,12 @@ defmodule Agento.Hub.Config do
     end
   end
 
+  # An empty path would expand to the working directory.
   defp optional_string(edn, key) do
     case Map.get(edn, key) do
       nil -> {:ok, nil}
-      value when is_binary(value) -> {:ok, value}
-      _ -> {:error, "#{key} must be a string"}
+      value when is_binary(value) and value != "" -> {:ok, value}
+      _ -> {:error, "#{key} must be a non-empty string"}
     end
   end
 

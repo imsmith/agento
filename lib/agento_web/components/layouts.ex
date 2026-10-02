@@ -79,6 +79,14 @@ defmodule AgentoWeb.Layouts do
               <.icon name="hero-wrench-screwdriver-mini" class="size-4" /> Tools
             </.link>
           </li>
+          <li>
+            <.link
+              navigate="/hub"
+              class={nav_class(@active_nav == :hub)}
+            >
+              <.icon name="hero-arrows-right-left-mini" class="size-4" /> Hub
+            </.link>
+          </li>
           <li class="ml-2">
             <.theme_toggle />
           </li>

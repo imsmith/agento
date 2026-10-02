@@ -59,6 +59,7 @@ defmodule AgentoWeb.Router do
       live "/events", EventsLive
       live "/system", SystemLive
       live "/tools", ToolsLive
+      live "/hub", HubLive
     end
   end
 end

@@ -63,12 +63,19 @@ defmodule Agento.Hub.Router do
   defp model(%ToolAd{binding: {_kind, %{model: model}}}), do: model
   defp model(_ad), do: nil
 
-  # An ad is on a host when the host is the hostname of its api_host, or the
-  # hostname in an mDNS ad id (mdns:_llama._tcp:<hostname>:<port>). Whole
-  # hostnames only: a name that merely contains the host does not match.
-  defp on_host?(%ToolAd{id: id, binding: binding}, host) do
+  @doc """
+  Whether `ad` is on `host`: the host is the hostname of its `api_host`, or
+  the hostname in an mDNS ad id (`mdns:_llama._tcp:<hostname>:<port>`). Whole
+  hostnames only: a name that merely contains the host does not match.
+  """
+  @spec on_host?(ToolAd.t(), String.t()) :: boolean()
+  def on_host?(%ToolAd{id: id, binding: binding}, host) do
     mdns_host(id) == host or api_hostname(binding) == host
   end
+
+  @doc "The name a performer is known by: its mDNS hostname, else the hostname of its `api_host`."
+  @spec host(ToolAd.t()) :: String.t() | nil
+  def host(%ToolAd{id: id, binding: binding}), do: mdns_host(id) || api_hostname(binding)
 
   defp mdns_host("mdns:" <> rest) do
     case String.split(rest, ":") do

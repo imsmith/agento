@@ -19,6 +19,7 @@ The app boots at `/`, which redirects to `/chat`.
 | `/events`  | `EventsLive`  | Live event stream with topic/type filters (R3).                |
 | `/system`  | `SystemLive`  | Supervision tree, ETS, Comn contexts, DurableLog (R4, R5, R7). |
 | `/tools`   | `ToolsLive`   | Tool registry browser and manual invocation (R6).             |
+| `/hub`     | `HubLive`     | The private LLM hub: performers, clients, settings, live turns. |
 
 `GET /export/:agent?kind=events|messages` streams an agent's event log or
 message history as a JSON download.
@@ -202,7 +203,8 @@ Erlang distribution and the port mapper stay on loopback regardless.
 | Where the hub is right now | `tclsh scripts/hub-url.tcl`, or busybody's directory page |
 | Turn log (SQLite) | `~/.local/share/agento/hub_turns.sqlite` |
 | Service log | `journalctl --user -u agento` |
-| Live traffic | the Events view, topic `hub.request` |
+| The hub at a glance | the Hub view (`/hub`): performers, clients, settings, recent turns, live |
+| Raw hub events | the Events view, topic `hub.request` |
 
 The turn log has one row per turn: client, requested model, performer,
 outcome, token counts, duration, and the request and reply exactly as they

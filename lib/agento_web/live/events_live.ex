@@ -220,6 +220,11 @@ defmodule AgentoWeb.EventsLive do
     {:noreply, assign(socket, selected_event: nil)}
   end
 
+  # A source is a module, an atom, a string — or, from a rule's emit,
+  # `{LLMAgent.Anemos.Channel, runtime}`. Only the first three are iodata.
+  defp source_text(source) when is_binary(source) or is_atom(source), do: source
+  defp source_text(source), do: inspect(source)
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -423,7 +428,9 @@ defmodule AgentoWeb.EventsLive do
                     {topic}
                   </td>
                   <td class="text-xs">{Map.get(event, :type, "")}</td>
-                  <td class="text-xs truncate max-w-32">{Map.get(event, :source, "")}</td>
+                  <td class="text-xs truncate max-w-32">
+                    {source_text(Map.get(event, :source, ""))}
+                  </td>
                   <td>
                     <button
                       type="button"
@@ -524,7 +531,9 @@ defmodule AgentoWeb.EventsLive do
                   <td class="font-mono text-xs">{Map.get(event, :timestamp, "")}</td>
                   <td class="text-xs">{Map.get(event, :topic, "")}</td>
                   <td class="text-xs">{Map.get(event, :type, "")}</td>
-                  <td class="text-xs truncate max-w-32">{Map.get(event, :source, "")}</td>
+                  <td class="text-xs truncate max-w-32">
+                    {source_text(Map.get(event, :source, ""))}
+                  </td>
                   <td>
                     <.icon name="hero-chevron-right-mini" class="size-3" />
                   </td>
@@ -602,7 +611,9 @@ defmodule AgentoWeb.EventsLive do
                   <td class="font-mono text-xs">{Map.get(event, :timestamp, "")}</td>
                   <td class="text-xs">{Map.get(event, :topic, "")}</td>
                   <td class="text-xs">{Map.get(event, :type, "")}</td>
-                  <td class="text-xs truncate max-w-32">{Map.get(event, :source, "")}</td>
+                  <td class="text-xs truncate max-w-32">
+                    {source_text(Map.get(event, :source, ""))}
+                  </td>
                 </tr>
               <% end %>
             </tbody>

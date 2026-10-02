@@ -171,14 +171,14 @@ defmodule Agento.Hub.Config do
       {:ok, dir, tools, ui_deploy}
     end
   end
-end
 
-defp rules(_other), do: {:error, "rules must be a map"}
+  defp rules(_other), do: {:error, "rules must be a map"}
 
-defp boolean(map, key, default) do
-  case Map.get(map, key, default) do
-    value when is_boolean(value) -> {:ok, value}
-    _ -> {:error, "#{key} must be true or false"}
+  defp boolean(map, key, default) do
+    case Map.get(map, key, default) do
+      value when is_boolean(value) -> {:ok, value}
+      _ -> {:error, "#{key} must be true or false"}
+    end
   end
 
   defp patterns(%EDN.Vector{} = vector), do: patterns(Enum.to_list(vector))

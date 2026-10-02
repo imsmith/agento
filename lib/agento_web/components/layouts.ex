@@ -87,6 +87,14 @@ defmodule AgentoWeb.Layouts do
               <.icon name="hero-arrows-right-left-mini" class="size-4" /> Hub
             </.link>
           </li>
+          <li>
+            <.link
+              navigate="/rules"
+              class={nav_class(@active_nav == :rules)}
+            >
+              <.icon name="hero-bolt-mini" class="size-4" /> Rules
+            </.link>
+          </li>
           <li class="ml-2">
             <.theme_toggle />
           </li>

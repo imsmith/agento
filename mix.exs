@@ -65,6 +65,7 @@ defmodule Agento.MixProject do
       # Comn comes transitively through LLMAgent
       # Hub: edn configuration and the SQLite turn log
       {:ex_edn, path: "../ex_edn"},
+      {:anemos, path: "../anemos"},
       {:exqlite, "~> 0.27"},
       {:bypass, "~> 2.1", only: :test},
       # Not in test: a test run must not announce itself in the directory.

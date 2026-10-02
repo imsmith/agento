@@ -67,6 +67,25 @@ defmodule Agento.Hub.ConfigTest do
       assert config.default_host == nil
     end
 
+    test "the rules directory and tool patterns, with defaults", %{dir: dir} do
+      assert {:ok, config} = Config.load(write(dir, "{:clients []}"))
+      assert config.rules_dir == Path.expand("~/.config/agento/rules")
+      assert config.rules_tools == []
+
+      edn =
+        ~s({:clients [] :rules {:dir "/etc/agento/rules" :tools ["resource.*" "function.crypto.*"]}})
+
+      assert {:ok, config} = Config.load(write(dir, edn))
+      assert config.rules_dir == "/etc/agento/rules"
+      assert config.rules_tools == ["resource.*", "function.crypto.*"]
+
+      assert {:error, message} = Config.load(write(dir, ~s({:clients [] :rules {:tools "all"}})))
+      assert message =~ "coordinate patterns"
+
+      assert {:error, message} = Config.load(write(dir, ~s({:clients [] :rules {:watch "x"}})))
+      assert message =~ "unknown key under :rules"
+    end
+
     test "a missing file is a config with no clients", %{dir: dir} do
       assert {:ok, %Config{clients: [], retention_days: 30}} =
                Config.load(Path.join(dir, "absent.edn"))

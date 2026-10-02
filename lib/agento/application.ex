@@ -9,16 +9,21 @@ defmodule Agento.Application do
   def start(_type, _args) do
     load_hub_config!()
 
-    children = [
-      AgentoWeb.Telemetry,
-      {DNSCluster, query: Application.get_env(:agento, :dns_cluster_query) || :ignore},
-      {Phoenix.PubSub, name: Agento.PubSub},
-      AgentoWeb.Discovery.Events,
-      Agento.EventBusBridge,
-      AgentoWeb.Harness.Registry,
-      hub_turn_log(),
-      AgentoWeb.Endpoint
-    ] ++ busybody_children()
+    children =
+      [
+        AgentoWeb.Telemetry,
+        {DNSCluster, query: Application.get_env(:agento, :dns_cluster_query) || :ignore},
+        {Phoenix.PubSub, name: Agento.PubSub},
+        AgentoWeb.Discovery.Events,
+        Agento.EventBusBridge,
+        AgentoWeb.Harness.Registry,
+        # The rules runtime and its attachment to the substrate, in this
+        # order: the attachment binds into the runtime at start.
+        Agento.Rules.runtime_spec(),
+        Agento.Rules.attachment_spec(),
+        hub_turn_log(),
+        AgentoWeb.Endpoint
+      ] ++ busybody_children()
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options

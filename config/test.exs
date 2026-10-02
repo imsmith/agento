@@ -38,3 +38,5 @@ config :agento, hub_config_path: "/nonexistent/agento-test-hub.edn"
 
 # The supervised turn log writes here, never under the developer's home.
 config :agento, hub_data_dir: Path.join(System.tmp_dir!(), "agento-test-hub-data")
+# The rules runtime watches this instead of ~/.config/agento/rules.
+config :agento, rules_dir: Path.join(System.tmp_dir!(), "agento-test-rules")

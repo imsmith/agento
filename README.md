@@ -20,6 +20,7 @@ The app boots at `/`, which redirects to `/chat`.
 | `/system`  | `SystemLive`  | Supervision tree, ETS, Comn contexts, DurableLog (R4, R5, R7). |
 | `/tools`   | `ToolsLive`   | Tool registry browser and manual invocation (R6).             |
 | `/hub`     | `HubLive`     | The private LLM hub: performers, clients, settings, live turns. |
+| `/rules`   | `RulesLive`   | The rules this machine runs: policies, state, trace, deploy, explain. |
 
 `GET /export/:agent?kind=events|messages` streams an agent's event log or
 message history as a JSON download.
@@ -205,6 +206,8 @@ Erlang distribution and the port mapper stay on loopback regardless.
 | Service log | `journalctl --user -u agento` |
 | The hub at a glance | the Hub view (`/hub`): performers, clients, settings, recent turns, live |
 | Raw hub events | the Events view, topic `hub.request` |
+| Rules (`.rule` files, deployed on save) | `~/.config/agento/rules`, or `:rules {:dir ...}` in `hub.edn` |
+| The rules at a glance | the Rules view (`/rules`): what is loaded, its state, the last events, deploy and explain |
 
 The turn log has one row per turn: client, requested model, performer,
 outcome, token counts, duration, and the request and reply exactly as they
@@ -224,6 +227,38 @@ without either body.
 A hub configuration that cannot be trusted stops agento at boot with a
 message saying why: a file readable by anyone but its owner, malformed edn,
 two clients sharing a token, an unknown key.
+
+## Rules
+
+Agento runs an [Anemos](../anemos) runtime, `:agento`, with the substrate
+attached: every substrate event is an event a rule can wait for, named
+after its topic (`hub.request` is `HUB_REQUEST`, the topic is the context
+path, the data are the `?` facts), and every discovered tool is a module a
+rule can call (`resource.net` is `[RESOURCE_NET::ping :host "x"]`).
+
+```text
+rule note-turns {
+  context "hub" {
+    when HUB_REQUEST { log ?client }
+  }
+}
+```
+
+Save that as `~/.config/agento/rules/turns.rule` and it is running; edit it
+and it is replaced, with the state of any rule you did not touch kept;
+delete it and it is gone. The Rules view shows what is loaded and what the
+last events did, deploys a policy typed into it, and explains what an event
+would reach.
+
+A rule can call no tool until the hub configuration says which:
+
+```text
+:rules {:dir "~/.config/agento/rules" :tools ["resource.*" "function.crypto.*"]}
+```
+
+That list is the allow list of the policy every tool call from a rule is
+judged by, the same deny-by-default `LLMAgent.Tool.Policy` the hub's
+clients get. Policy text is not trusted with anything it is not given.
 
 ## Architecture
 

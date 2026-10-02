@@ -19,4 +19,9 @@
  :performer-timeout-seconds 900
 
  ; The turn log and the durable event log live here.
- :data-dir "~/.local/share/agento"}
+ :data-dir "~/.local/share/agento"
+
+ ; Rules. Every .rule file in :dir is deployed on save. :tools is the allow
+ ; list, by coordinate pattern, of the tools a rule may call; empty, a rule
+ ; can call none.
+ :rules {:dir "~/.config/agento/rules" :tools []}}

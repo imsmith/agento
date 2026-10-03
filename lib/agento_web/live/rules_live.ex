@@ -116,6 +116,13 @@ defmodule AgentoWeb.RulesLive do
   defp step_text(%{rule: rule, outcome: outcome}), do: "#{rule}: #{outcome}"
 
   defp result_text(%{type: :log, value: value}), do: "log #{inspect(value)}"
+
+  defp result_text(%{type: :assert, subject: s, held: held}),
+    do: "assert #{s}: #{if held, do: "held", else: "failed, rule stopped"}"
+
+  defp result_text(%{type: type, subject: s, value: value}),
+    do: "#{type} #{s}: #{inspect(value, limit: 20, printable_limit: 200)}"
+
   defp result_text(%{type: :error, reason: reason}), do: "error #{inspect(reason)}"
   defp result_text(%{type: type}), do: to_string(type)
 

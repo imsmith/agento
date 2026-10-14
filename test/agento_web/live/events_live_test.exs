@@ -107,7 +107,9 @@ defmodule AgentoWeb.EventsLiveTest do
       assert html =~ ~s(id="event-stream")
       assert has_element?(view, "#event-stream[data-auto-scroll=true]")
 
+      assert has_element?(view, ".ds-fresh--live", "LIVE")
       view |> element("[phx-click=toggle_auto_scroll]") |> render_click()
+      assert has_element?(view, ".ds-fresh--paused", "PAUSED")
       assert has_element?(view, "#event-stream[data-auto-scroll=false]")
     end
 

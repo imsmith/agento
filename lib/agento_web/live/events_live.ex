@@ -230,33 +230,23 @@ defmodule AgentoWeb.EventsLive do
     ~H"""
     <.app flash={@flash} active_nav={:events}>
       <div class="flex flex-col h-full">
-        <%!-- Tabs --%>
-        <div class="tabs tabs-bordered px-4 pt-2 bg-base-100 border-b border-base-300">
-          <button
-            phx-click="set_tab"
-            phx-value-tab="live"
-            class={["tab", @active_tab == :live && "tab-active"]}
-          >
-            Live Stream
-          </button>
-          <button
-            phx-click="set_tab"
-            phx-value-tab="durable_log"
-            class={["tab", @active_tab == :durable_log && "tab-active"]}
-          >
-            DurableLog Query
-          </button>
-          <button
-            phx-click="set_tab"
-            phx-value-tab="event_log"
-            class={["tab", @active_tab == :event_log && "tab-active"]}
-          >
-            EventLog Query
-          </button>
+        <div class="ds-tabs">
+          <div class="ds-tabs__list" role="tablist">
+            <button
+              :for={{id, label} <- tabs()}
+              type="button"
+              role="tab"
+              class="ds-tab"
+              aria-selected={to_string(@active_tab == id)}
+              phx-click="set_tab"
+              phx-value-tab={id}
+            >
+              <span>{label}</span>
+            </button>
+          </div>
         </div>
 
-        <div class="flex-1 overflow-hidden flex">
-          <%!-- Main content --%>
+        <div class="flex-1 overflow-hidden flex gap-2 pt-1">
           <div class="flex-1 flex flex-col overflow-hidden">
             <%= case @active_tab do %>
               <% :live -> %>
@@ -290,188 +280,93 @@ defmodule AgentoWeb.EventsLive do
                   known_agents={@known_agents}
                 />
               <% :event_log -> %>
-                <.event_log_panel
-                  mode={@eventlog_mode}
-                  filter={@eventlog_filter}
-                  results={@eventlog_results}
-                />
+                <.event_log_panel mode={@eventlog_mode} filter={@eventlog_filter} results={@eventlog_results} />
             <% end %>
           </div>
 
-          <%!-- Event detail sidebar (R3.5) --%>
-          <%= if @selected_event do %>
-            <aside class="w-96 border-l border-base-300 bg-base-200 overflow-y-auto p-4">
-              <div class="flex items-center justify-between mb-3">
-                <h3 class="font-semibold">Event Detail</h3>
-                <button phx-click="close_event_detail" class="btn btn-ghost btn-xs">
-                  <.icon name="hero-x-mark-mini" class="size-4" />
-                </button>
-              </div>
-              <.event_detail event={@selected_event} />
-            </aside>
-          <% end %>
+          <.card :if={@selected_event} title="Event detail" density={:compact} class="w-48 overflow-y-auto">
+            <:actions>
+              <.button size={:sm} icon="m-close" phx-click="close_event_detail" title="Close">
+                <span class="sr-only">Close</span>
+              </.button>
+            </:actions>
+            <.event_detail event={@selected_event} />
+          </.card>
         </div>
       </div>
     </.app>
     """
   end
 
+  defp tabs, do: [live: "Live Stream", durable_log: "DurableLog Query", event_log: "EventLog Query"]
+
   # -- Subcomponents --
 
   defp live_stream_panel(assigns) do
     ~H"""
     <div class="flex flex-col h-full">
-      <%!-- Filters --%>
-      <div class="p-3 border-b border-base-300 bg-base-100">
-        <form id="event-filter-form" phx-change="update_filter" class="flex gap-2 items-end flex-wrap">
-          <div>
-            <label class="label text-xs">Topic</label>
-            <select name="topic" class="select select-bordered select-sm">
-              <option value="">All topics</option>
-              <%= for t <- @known_topics do %>
-                <option value={t} selected={@filter_topic == t}>{t}</option>
-              <% end %>
-            </select>
-          </div>
-          <div>
-            <label class="label text-xs">Type</label>
-            <select name="type" class="select select-bordered select-sm">
-              <option value="">All types</option>
-              <%= for t <- @known_types do %>
-                <option value={t} selected={@filter_type == to_string(t)}>{t}</option>
-              <% end %>
-            </select>
-          </div>
-          <div>
-            <label class="label text-xs">Agent</label>
-            <select name="agent_id" class="select select-bordered select-sm">
-              <option value="">All agents</option>
-              <%= for a <- @known_agents do %>
-                <option value={a} selected={@filter_agent_id == to_string(a)}>{a}</option>
-              <% end %>
-            </select>
-          </div>
-          <div>
-            <label class="label text-xs">From</label>
-            <input
-              type="datetime-local"
-              name="from"
-              value={@filter_from}
-              class="input input-bordered input-sm"
-            />
-          </div>
-          <div>
-            <label class="label text-xs">To</label>
-            <input
-              type="datetime-local"
-              name="to"
-              value={@filter_to}
-              class="input input-bordered input-sm"
-            />
-          </div>
-          <button type="button" phx-click="clear_filters" class="btn btn-ghost btn-sm">
-            Clear
-          </button>
-          <div class="flex-1"></div>
-          <button
-            type="button"
-            phx-click="toggle_auto_scroll"
-            class={[
-              "btn btn-sm",
-              if(@auto_scroll, do: "btn-primary", else: "btn-ghost")
-            ]}
-          >
-            Auto-scroll
-          </button>
-          <button type="button" phx-click="clear_stream" class="btn btn-ghost btn-sm">
-            Clear stream
-          </button>
-        </form>
-      </div>
+      <form id="live-filters" phx-change="update_filter" class="flex gap-1 items-end flex-wrap p-1 border-b border-border">
+        <.select name="topic" label="Topic" options={@known_topics} value={@filter_topic}>
+          <option value="">All topics</option>
+        </.select>
+        <.select name="type" label="Type" options={Enum.map(@known_types, &to_string/1)} value={@filter_type}>
+          <option value="">All types</option>
+        </.select>
+        <.select name="agent_id" label="Agent" options={Enum.map(@known_agents, &to_string/1)} value={@filter_agent_id}>
+          <option value="">All agents</option>
+        </.select>
+        <.input type="datetime-local" name="from" label="From" value={@filter_from} />
+        <.input type="datetime-local" name="to" label="To" value={@filter_to} />
+        <.button type="button" size={:sm} phx-click="clear_filters">Clear</.button>
+        <div class="flex-1"></div>
+        <.freshness state={if @auto_scroll, do: :live, else: :paused} />
+        <.button type="button" size={:sm} variant={if @auto_scroll, do: :primary, else: :ghost} phx-click="toggle_auto_scroll">Auto-scroll</.button>
+        <.button type="button" size={:sm} phx-click="clear_stream">Clear stream</.button>
+      </form>
 
-      <%!-- Event list --%>
-      <div
-        class="flex-1 overflow-y-auto"
-        id="event-stream"
-        phx-hook="AutoScroll"
-        data-auto-scroll={to_string(@auto_scroll)}
-      >
-        <%= if @events == [] do %>
-          <p class="p-4 text-sm text-base-content/50">No events yet. Waiting for activity...</p>
-        <% else %>
-          <table class="table table-xs table-zebra w-full">
-            <thead class="sticky top-0 bg-base-200">
+      <div class="flex-1 overflow-y-auto" id="event-stream" phx-hook="AutoScroll" data-auto-scroll={to_string(@auto_scroll)}>
+        <.empty :if={@events == []}>No events yet. Waiting for activity.</.empty>
+        <div :if={@events != []} class="overflow-x-auto">
+          <table class="ds-table ds-table--dense w-full">
+            <thead class="sticky top-0 bg-surface">
               <tr>
-                <th class="w-44">Timestamp</th>
-                <th>Topic</th>
-                <th>Type</th>
-                <th>Source</th>
-                <th class="w-8"></th>
-                <th class="w-8"></th>
+                <th class="ds-table__th w-22">Timestamp</th>
+                <th class="ds-table__th">Topic</th>
+                <th class="ds-table__th">Type</th>
+                <th class="ds-table__th">Source</th>
+                <th class="ds-table__th w-4"></th>
+                <th class="ds-table__th w-4"></th>
               </tr>
             </thead>
             <tbody>
               <%= for {{topic, event}, idx} <- Enum.with_index(@events) do %>
-                <tr class="hover">
-                  <td
-                    class="font-mono text-xs cursor-pointer"
-                    phx-click="show_event"
-                    phx-value-index={idx}
-                  >
+                <tr class="ds-table__row ds-table__row--interactive">
+                  <td class="ds-table__td cursor-pointer" phx-click="show_event" phx-value-index={idx}>
                     {Map.get(event, :timestamp, "")}
                   </td>
-                  <td
-                    class="text-xs cursor-pointer"
-                    phx-click="show_event"
-                    phx-value-index={idx}
-                  >
+                  <td class="ds-table__td cursor-pointer" phx-click="show_event" phx-value-index={idx}>
                     {topic}
                   </td>
-                  <td class="text-xs">{Map.get(event, :type, "")}</td>
-                  <td class="text-xs truncate max-w-32">
-                    {source_text(Map.get(event, :source, ""))}
+                  <td class="ds-table__td">{Map.get(event, :type, "")}</td>
+                  <td class="ds-table__td truncate max-w-16">{source_text(Map.get(event, :source, ""))}</td>
+                  <td class="ds-table__td">
+                    <.button type="button" size={:sm} variant={:text} phx-click="toggle_row" phx-value-index={idx} title="Expand payload" aria-expanded={to_string(MapSet.member?(@expanded_rows, idx))}>
+                      <.mark name="m-chevron" size={12} class={MapSet.member?(@expanded_rows, idx) && "rotate-90"} />
+                    </.button>
                   </td>
-                  <td>
-                    <button
-                      type="button"
-                      phx-click="toggle_row"
-                      phx-value-index={idx}
-                      class="btn btn-ghost btn-xs"
-                      title="Expand payload"
-                    >
-                      <.icon
-                        name={
-                          if MapSet.member?(@expanded_rows, idx),
-                            do: "hero-chevron-down-mini",
-                            else: "hero-chevron-right-mini"
-                        }
-                        class="size-3"
-                      />
-                    </button>
-                  </td>
-                  <td>
-                    <button
-                      type="button"
-                      phx-click="show_event"
-                      phx-value-index={idx}
-                      class="btn btn-ghost btn-xs"
-                      title="Open detail"
-                    >
-                      <.icon name="hero-arrow-top-right-on-square-mini" class="size-3" />
-                    </button>
+                  <td class="ds-table__td">
+                    <.button type="button" size={:sm} variant={:text} icon="m-external" phx-click="show_event" phx-value-index={idx} title="Open detail">
+                      <span class="sr-only">Open</span>
+                    </.button>
                   </td>
                 </tr>
-                <%= if MapSet.member?(@expanded_rows, idx) do %>
-                  <tr class="bg-base-200">
-                    <td colspan="6" class="p-0">
-                      <pre class="text-xs font-mono bg-base-300 p-3 m-2 rounded whitespace-pre-wrap overflow-x-auto">{inspect(Map.get(event, :data, %{}), pretty: true)}</pre>
-                    </td>
-                  </tr>
-                <% end %>
+                <tr :if={MapSet.member?(@expanded_rows, idx)}>
+                  <td colspan="6" class="ds-table__td p-0"><.pre value={Map.get(event, :data, %{})} class="m-1" /></td>
+                </tr>
               <% end %>
             </tbody>
           </table>
-        <% end %>
+        </div>
       </div>
     </div>
     """
@@ -480,69 +375,32 @@ defmodule AgentoWeb.EventsLive do
   defp durable_log_panel(assigns) do
     ~H"""
     <div class="flex flex-col h-full">
-      <div class="p-4 border-b border-base-300 bg-base-100">
-        <h3 class="font-semibold mb-2">DurableLog Query (R3.3)</h3>
-        <form
-          id="durable-query-form"
-          phx-submit="query_durable_log"
-          phx-change="update_durable_query"
-          class="flex gap-2 items-end"
-        >
-          <div>
-            <label class="label text-xs">Agent ID</label>
-            <input
-              type="text"
-              name="agent_id"
-              value={@query_agent_id}
-              placeholder="agent_name"
-              class="input input-bordered input-sm"
-            />
-          </div>
-          <div>
-            <label class="label text-xs">Since (ISO 8601, optional)</label>
-            <input
-              type="text"
-              name="since"
-              value={@query_since}
-              placeholder="2026-02-24T00:00:00Z"
-              class="input input-bordered input-sm"
-            />
-          </div>
-          <button type="submit" class="btn btn-primary btn-sm">Query</button>
+      <div class="p-1 border-b border-border">
+        <h3 class="ds-label mb-1">DurableLog query</h3>
+        <form id="durable-log-query" phx-submit="query_durable_log" phx-change="update_durable_query" class="flex gap-1 items-end">
+          <.input name="agent_id" label="Agent ID" value={@query_agent_id} placeholder="agent_name" />
+          <.input name="since" label="Since (ISO 8601, optional)" value={@query_since} placeholder="2026-02-24T00:00:00Z" />
+          <.button type="submit" variant={:primary} size={:sm}>Query</.button>
         </form>
       </div>
-
       <div class="flex-1 overflow-y-auto">
-        <%= if @query_results == [] do %>
-          <p class="p-4 text-sm text-base-content/50">No results. Run a query above.</p>
-        <% else %>
-          <table class="table table-xs table-zebra w-full">
-            <thead class="sticky top-0 bg-base-200">
-              <tr>
-                <th class="w-44">Timestamp</th>
-                <th>Topic</th>
-                <th>Type</th>
-                <th>Source</th>
-                <th class="w-12"></th>
-              </tr>
+        <.empty :if={@query_results == []}>No results. Run a query above.</.empty>
+        <div :if={@query_results != []} class="overflow-x-auto">
+          <table class="ds-table ds-table--dense w-full">
+            <thead class="sticky top-0 bg-surface">
+              <tr><th class="ds-table__th w-22">Timestamp</th><th class="ds-table__th">Topic</th><th class="ds-table__th">Type</th><th class="ds-table__th">Source</th><th class="ds-table__th w-4"></th></tr>
             </thead>
             <tbody>
-              <%= for {event, idx} <- Enum.with_index(@query_results) do %>
-                <tr class="hover cursor-pointer" phx-click="show_query_event" phx-value-index={idx}>
-                  <td class="font-mono text-xs">{Map.get(event, :timestamp, "")}</td>
-                  <td class="text-xs">{Map.get(event, :topic, "")}</td>
-                  <td class="text-xs">{Map.get(event, :type, "")}</td>
-                  <td class="text-xs truncate max-w-32">
-                    {source_text(Map.get(event, :source, ""))}
-                  </td>
-                  <td>
-                    <.icon name="hero-chevron-right-mini" class="size-3" />
-                  </td>
-                </tr>
-              <% end %>
+              <tr :for={{event, idx} <- Enum.with_index(@query_results)} class="ds-table__row ds-table__row--interactive cursor-pointer" phx-click="show_query_event" phx-value-index={idx} tabindex="0">
+                <td class="ds-table__td">{Map.get(event, :timestamp, "")}</td>
+                <td class="ds-table__td">{Map.get(event, :topic, "")}</td>
+                <td class="ds-table__td">{Map.get(event, :type, "")}</td>
+                <td class="ds-table__td truncate max-w-16">{source_text(Map.get(event, :source, ""))}</td>
+                <td class="ds-table__td"><.mark name="m-chevron" size={12} /></td>
+              </tr>
             </tbody>
           </table>
-        <% end %>
+        </div>
       </div>
     </div>
     """
@@ -551,105 +409,50 @@ defmodule AgentoWeb.EventsLive do
   defp event_log_panel(assigns) do
     ~H"""
     <div class="flex flex-col h-full">
-      <div class="p-4 border-b border-base-300 bg-base-100">
-        <h3 class="font-semibold mb-2">EventLog Query (R3.4, in-memory)</h3>
-        <form
-          id="eventlog-query-form"
-          phx-submit="query_event_log"
-          phx-change="update_eventlog_query"
-          class="flex gap-2 items-end"
-        >
-          <div>
-            <label class="label text-xs">Mode</label>
-            <select name="mode" class="select select-bordered select-sm">
-              <option value="all" selected={@mode == "all"}>all()</option>
-              <option value="for_topic" selected={@mode == "for_topic"}>for_topic/1</option>
-              <option value="for_type" selected={@mode == "for_type"}>for_type/1</option>
-              <option value="since" selected={@mode == "since"}>since/1</option>
-            </select>
-          </div>
-          <%= if @mode != "all" do %>
-            <div>
-              <label class="label text-xs">
-                <%= case @mode do %>
-                  <% "for_topic" -> %>
-                    Topic
-                  <% "for_type" -> %>
-                    Type (atom)
-                  <% "since" -> %>
-                    Timestamp (ISO 8601)
-                  <% _ -> %>
-                    Filter
-                <% end %>
-              </label>
-              <input
-                type="text"
-                name="filter"
-                value={@filter}
-                class="input input-bordered input-sm"
-              />
-            </div>
-          <% end %>
-          <button type="submit" class="btn btn-primary btn-sm">Query</button>
+      <div class="p-1 border-b border-border">
+        <h3 class="ds-label mb-1">EventLog query (in-memory)</h3>
+        <form id="event-log-query" phx-submit="query_event_log" phx-change="update_eventlog_query" class="flex gap-1 items-end">
+          <.select name="mode" label="Query mode" options={[{"all()", "all"}, {"for_topic/1", "for_topic"}, {"for_type/1", "for_type"}, {"since/1", "since"}]} value={@mode} />
+          <.input :if={@mode != "all"} name="filter" label={filter_label(@mode)} value={@filter} />
+          <.button type="submit" variant={:primary} size={:sm}>Query</.button>
         </form>
       </div>
-
       <div class="flex-1 overflow-y-auto">
-        <%= if @results == [] do %>
-          <p class="p-4 text-sm text-base-content/50">No results. Run a query above.</p>
-        <% else %>
-          <table class="table table-xs table-zebra w-full">
-            <thead class="sticky top-0 bg-base-200">
-              <tr>
-                <th class="w-44">Timestamp</th>
-                <th>Topic</th>
-                <th>Type</th>
-                <th>Source</th>
-              </tr>
+        <.empty :if={@results == []}>No results. Run a query above.</.empty>
+        <div :if={@results != []} class="overflow-x-auto">
+          <table class="ds-table ds-table--dense w-full">
+            <thead class="sticky top-0 bg-surface">
+              <tr><th class="ds-table__th w-22">Timestamp</th><th class="ds-table__th">Topic</th><th class="ds-table__th">Type</th><th class="ds-table__th">Source</th></tr>
             </thead>
             <tbody>
-              <%= for {event, idx} <- Enum.with_index(@results) do %>
-                <tr class="hover cursor-pointer" phx-click="show_eventlog_event" phx-value-index={idx}>
-                  <td class="font-mono text-xs">{Map.get(event, :timestamp, "")}</td>
-                  <td class="text-xs">{Map.get(event, :topic, "")}</td>
-                  <td class="text-xs">{Map.get(event, :type, "")}</td>
-                  <td class="text-xs truncate max-w-32">
-                    {source_text(Map.get(event, :source, ""))}
-                  </td>
-                </tr>
-              <% end %>
+              <tr :for={{event, idx} <- Enum.with_index(@results)} class="ds-table__row ds-table__row--interactive cursor-pointer" phx-click="show_eventlog_event" phx-value-index={idx} tabindex="0">
+                <td class="ds-table__td">{Map.get(event, :timestamp, "")}</td>
+                <td class="ds-table__td">{Map.get(event, :topic, "")}</td>
+                <td class="ds-table__td">{Map.get(event, :type, "")}</td>
+                <td class="ds-table__td truncate max-w-16">{source_text(Map.get(event, :source, ""))}</td>
+              </tr>
             </tbody>
           </table>
-        <% end %>
+        </div>
       </div>
     </div>
     """
   end
 
+  defp filter_label("for_topic"), do: "Topic"
+  defp filter_label("for_type"), do: "Type (atom)"
+  defp filter_label("since"), do: "Timestamp (ISO 8601)"
+  defp filter_label(_), do: "Filter"
+
   defp event_detail(assigns) do
     ~H"""
-    <div class="space-y-3 text-sm">
-      <div>
-        <span class="font-semibold">Timestamp:</span>
-        <span class="font-mono">{Map.get(@event, :timestamp, "N/A")}</span>
-      </div>
-      <div>
-        <span class="font-semibold">Topic:</span>
-        <span>{Map.get(@event, :topic, "N/A")}</span>
-      </div>
-      <div>
-        <span class="font-semibold">Type:</span>
-        <span>{Map.get(@event, :type, "N/A")}</span>
-      </div>
-      <div>
-        <span class="font-semibold">Source:</span>
-        <span>{Map.get(@event, :source, "N/A")}</span>
-      </div>
-      <div>
-        <span class="font-semibold">Data:</span>
-        <pre class="mt-1 text-xs font-mono bg-base-300 p-3 rounded whitespace-pre-wrap overflow-x-auto">{inspect(Map.get(@event, :data, %{}), pretty: true)}</pre>
-      </div>
-    </div>
+    <.key_value density={:dense}>
+      <:item key="Timestamp">{Map.get(@event, :timestamp, "N/A")}</:item>
+      <:item key="Topic">{Map.get(@event, :topic, "N/A")}</:item>
+      <:item key="Type">{Map.get(@event, :type, "N/A")}</:item>
+      <:item key="Source">{source_text(Map.get(@event, :source, "N/A"))}</:item>
+      <:item key="Data"><.pre value={Map.get(@event, :data, %{})} /></:item>
+    </.key_value>
     """
   end
 

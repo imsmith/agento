@@ -75,6 +75,10 @@ defmodule AgentoWeb.RulesLiveTest do
     assert html =~ "count"
     assert has_element?(view, "[id^=policy-live-test-rule]")
 
+    assert view
+           |> element("[id^=policy-live-test-rule] [data-step=unknown]", "loaded here")
+           |> has_element?()
+
     LLMAgent.Events.emit(:tick, "live.test.tick", %{}, :test)
     Process.sleep(100)
     send(view.pid, :refresh)

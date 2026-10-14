@@ -30,14 +30,20 @@ defmodule AgentoWeb.ExportController do
   end
 
   defp fetch_payload(agent, "events"), do: {:ok, LLMAgent.DurableLog.events_for(agent), "events"}
-  defp fetch_payload(agent, "messages"), do: {:ok, LLMAgent.DurableLog.messages_for(agent), "messages"}
+
+  defp fetch_payload(agent, "messages"),
+    do: {:ok, LLMAgent.DurableLog.messages_for(agent), "messages"}
+
   defp fetch_payload(_agent, _kind), do: {:error, :unknown_kind}
 
   defp to_jsonable(%_{} = struct), do: struct |> Map.from_struct() |> to_jsonable()
   defp to_jsonable(map) when is_map(map), do: Map.new(map, fn {k, v} -> {k, to_jsonable(v)} end)
   defp to_jsonable(list) when is_list(list), do: Enum.map(list, &to_jsonable/1)
   defp to_jsonable(tuple) when is_tuple(tuple), do: tuple |> Tuple.to_list() |> to_jsonable()
-  defp to_jsonable(atom) when is_atom(atom) and atom not in [nil, true, false], do: Atom.to_string(atom)
+
+  defp to_jsonable(atom) when is_atom(atom) and atom not in [nil, true, false],
+    do: Atom.to_string(atom)
+
   defp to_jsonable(pid) when is_pid(pid), do: inspect(pid)
   defp to_jsonable(ref) when is_reference(ref), do: inspect(ref)
   defp to_jsonable(other), do: other

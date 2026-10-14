@@ -158,7 +158,12 @@ defmodule AgentoWeb.ToolsLive do
             <%!-- Manual invocation (R6.3) --%>
             <div class="card bg-base-200 p-4">
               <h3 class="font-semibold text-sm mb-2">Manual Invocation</h3>
-              <form phx-submit="invoke_tool" phx-change="update_invoke" class="space-y-2">
+              <form
+                id="invoke-tool-form"
+                phx-submit="invoke_tool"
+                phx-change="update_invoke"
+                class="space-y-2"
+              >
                 <input
                   type="text"
                   name="action"

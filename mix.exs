@@ -6,7 +6,7 @@ defmodule Agento.MixProject do
     [
       app: :agento,
       version: "0.1.0",
-      elixir: "~> 1.15",
+      elixir: "~> 1.20",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
@@ -44,7 +44,7 @@ defmodule Agento.MixProject do
       {:phoenix, "~> 1.8.4"},
       {:phoenix_html, "~> 4.1"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
-      {:phoenix_live_view, "~> 1.1.0"},
+      {:phoenix_live_view, "~> 1.2"},
       {:lazy_html, ">= 0.1.0", only: :test},
       {:esbuild, "~> 0.10", runtime: Mix.env() == :dev},
       {:tailwind, "~> 0.3", runtime: Mix.env() == :dev},
@@ -59,13 +59,13 @@ defmodule Agento.MixProject do
       {:telemetry_poller, "~> 1.0"},
       {:gettext, "~> 1.0", override: true},
       {:jason, "~> 1.2"},
-      {:dns_cluster, "~> 0.2.0"},
+      {:dns_cluster, "~> 0.3"},
       {:bandit, "~> 1.5"},
       {:LLMAgent, path: "../llmagent"},
       # Comn comes transitively through LLMAgent
       # Hub: edn configuration and the SQLite turn log
-      {:ex_edn, path: "../ex_edn"},
-      {:anemos, path: "../anemos"},
+      {:ex_edn, path: "../ex_edn", override: true},
+      {:anemos, path: "../anemos", override: true},
       {:exqlite, "~> 0.27"},
       {:bypass, "~> 2.1", only: :test},
       # Not in test: a test run must not announce itself in the directory.

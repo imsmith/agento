@@ -20,7 +20,12 @@ defmodule AgentoWeb.Discovery.EndpointsTest do
         constraint: %{idempotency: %{}, blast_radius: %{}},
         affordance: %{declared: [], learned: [], open: false},
         fidelity: :authoritative,
-        provenance: %{source: "test", produced_at: DateTime.utc_now(), based_on: [], signature: nil},
+        provenance: %{
+          source: "test",
+          produced_at: DateTime.utc_now(),
+          based_on: [],
+          signature: nil
+        },
         lease: :permanent
       })
 

@@ -747,8 +747,6 @@ defmodule AgentoWeb.SystemLive do
     :exit, _ -> nil
   end
 
-  defp state_name(_), do: nil
-
   defp maybe_children(pid, :supervisor) when is_pid(pid) do
     try do
       Supervisor.which_children(pid)

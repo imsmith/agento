@@ -61,7 +61,7 @@ defmodule Agento.MixProject do
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.3"},
       {:bandit, "~> 1.5"},
-      {:gos_ui, git: "/home/imsmith/github/gos-ui", ref: "f2b725b57ad61af5fb5eee6a45b281edc7a74f6a"},
+      {:gos_ui, git: "/home/imsmith/github/gos-ui", ref: "9defdfb9b0bde162b9c32970b3a1ca65ea3f717d"},
       {:LLMAgent, path: "../llmagent"},
       # Comn comes transitively through LLMAgent
       # Hub: edn configuration and the SQLite turn log

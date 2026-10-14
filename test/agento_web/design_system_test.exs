@@ -36,4 +36,15 @@ defmodule AgentoWeb.DesignSystemTest do
     {:ok, _view, html} = live(conn, "/chat")
     assert html =~ ~s(id="theme-switch" phx-hook="ThemeSwitch" phx-update="ignore")
   end
+
+  test "connection toasts are present, hidden, and scoped to the client/server error states", %{conn: conn} do
+    {:ok, _view, html} = live(conn, "/chat")
+    for id <- ~w(client-error server-error) do
+      assert html =~ ~s(id="#{id}")
+      assert html =~ ~s(data-severity="critical")
+    end
+    assert html =~ ~s(.phx-client-error #client-error)
+    assert html =~ ~s(.phx-server-error #server-error)
+    assert html =~ ~r/id="client-error"[^>]*\shidden/
+  end
 end

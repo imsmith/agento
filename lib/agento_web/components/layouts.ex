@@ -44,7 +44,7 @@ defmodule AgentoWeb.Layouts do
         severity={:critical}
         title="Connection lost."
         hidden
-        phx-disconnected={JS.show(to: "#client-error")}
+        phx-disconnected={JS.show(to: ".phx-client-error #client-error")}
         phx-connected={JS.hide(to: "#client-error")}
       >
         The browser cannot reach the server. Reconnecting; nothing to do.
@@ -54,7 +54,7 @@ defmodule AgentoWeb.Layouts do
         severity={:critical}
         title="Server error."
         hidden
-        phx-disconnected={JS.show(to: "#server-error")}
+        phx-disconnected={JS.show(to: ".phx-server-error #server-error")}
         phx-connected={JS.hide(to: "#server-error")}
       >
         The view crashed and is restarting. If it repeats, check the server log.

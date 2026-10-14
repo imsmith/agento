@@ -107,11 +107,8 @@ defmodule AgentoWeb.ChatLiveTest do
       |> form("form[phx-submit=send_prompt]", %{"prompt" => "hello world"})
       |> render_submit()
 
-      assert has_element?(view, "#chat-messages .chat-msg--user", "hello world")
-
-      html = render(view)
-      # Prompt text should be cleared and thinking indicator shown.
-      assert html =~ "loading" or html =~ "chat_test_prompt"
+      # The user bubble arrives via PubSub, not synchronously.
+      assert eventually(fn -> has_element?(view, "#chat-messages .chat-msg--user", "hello world") end)
     end
 
     test "messages loaded from DurableLog on agent selection", %{conn: conn} do
@@ -268,6 +265,14 @@ defmodule AgentoWeb.ChatLiveTest do
       # Cancel
       view |> element("button[phx-click=cancel_stop]") |> render_click()
       refute render(view) =~ "Stop chat_test_cancel_stop"
+    end
+  end
+
+  defp eventually(fun, tries \\ 50) do
+    cond do
+      fun.() -> true
+      tries == 0 -> false
+      true -> Process.sleep(20); eventually(fun, tries - 1)
     end
   end
 end

@@ -267,8 +267,8 @@ defmodule AgentoWeb.ChatLive do
         <%!-- Agent sidebar --%>
         <.card title="Agents" density={:compact} flush class="w-32 flex flex-col min-h-0">
           <:actions>
-            <.button size={:sm} icon="m-refresh" phx-click="refresh_agents" title="Refresh">Refresh</.button>
-            <.button size={:sm} icon="m-add" phx-click="toggle_new_agent_form" title="New agent">New</.button>
+            <.button size={:sm} icon="m-refresh" phx-click="refresh_agents" title="Refresh"><span class="sr-only">Refresh</span></.button>
+            <.button size={:sm} icon="m-add" phx-click="toggle_new_agent_form" title="New agent"><span class="sr-only">New agent</span></.button>
           </:actions>
 
           <div :if={@show_new_agent_form} class="p-1 border-b border-border">

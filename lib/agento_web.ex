@@ -88,6 +88,9 @@ defmodule AgentoWeb do
       # Core UI components
       import AgentoWeb.CoreComponents
 
+      # Design-system components (imsmith/gos-ui)
+      use GosUi
+
       # Common modules used in templates
       alias Phoenix.LiveView.JS
       alias AgentoWeb.Layouts

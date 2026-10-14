@@ -24,6 +24,7 @@ import {Socket} from "phoenix"
 import {LiveSocket} from "phoenix_live_view"
 import {hooks as colocatedHooks} from "phoenix-colocated/agento"
 import topbar from "../vendor/topbar"
+import {GosUiHooks} from "../../deps/gos_ui/priv/static/gos-ui/gos-ui.js"
 
 // AutoScroll: keep a live-updating container pinned to the bottom.
 // The Event Explorer stream sets data-auto-scroll="true|false" on the
@@ -43,15 +44,34 @@ Hooks.AutoScroll = {
   },
 }
 
+// ThemeSwitch: the gos-ui theme_switch form, driven client-side. Theme and
+// mode live in localStorage and on <html>; the server never learns them.
+Hooks.ThemeSwitch = {
+  mounted() {
+    const html = document.documentElement
+    const theme = this.el.querySelector("select[name=theme]")
+    const mode = this.el.querySelector("select[name=mode]")
+    theme.value = localStorage.getItem("gos:theme") || "tron"
+    mode.value = localStorage.getItem("gos:mode") || "dark"
+    this.el.addEventListener("change", () => {
+      localStorage.setItem("gos:theme", theme.value)
+      localStorage.setItem("gos:mode", mode.value)
+      html.setAttribute("data-theme", theme.value)
+      if (mode.value === "light") html.setAttribute("data-mode", "light")
+      else html.removeAttribute("data-mode")
+    })
+  },
+}
+
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks, ...Hooks},
+  hooks: {...colocatedHooks, ...GosUiHooks, ...Hooks},
 })
 
 // Show progress bar on live navigation and form submits
-topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
+topbar.config({barColors: {0: "var(--accent)"}, shadowColor: "rgba(0, 0, 0, .3)"})
 window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
 window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
 

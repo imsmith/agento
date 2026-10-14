@@ -45,7 +45,9 @@ defmodule AgentoWeb.HarnessController do
 
     case Registry.lookup(sid) do
       {:error, :not_found} ->
-        conn |> put_status(404) |> json(error_body("unknown_session", "session_id", "no such session"))
+        conn
+        |> put_status(404)
+        |> json(error_body("unknown_session", "session_id", "no such session"))
 
       {:ok, session} ->
         do_interact(conn, session, fold_str, context, req_ts)
@@ -55,7 +57,9 @@ defmodule AgentoWeb.HarnessController do
   defp do_interact(conn, session, fold_str, context, req_ts) do
     case Session.reconcile(session.id, fold_str, context) do
       {:error, :not_found} ->
-        conn |> put_status(404) |> json(error_body("unknown_session", "session_id", "no such session"))
+        conn
+        |> put_status(404)
+        |> json(error_body("unknown_session", "session_id", "no such session"))
 
       {:diverged, current} ->
         conn
@@ -124,6 +128,13 @@ defmodule AgentoWeb.HarnessController do
   end
 
   defp error_body(reason, field, message) do
-    %{"error" => %{"reason" => reason, "field" => field, "message" => message, "suggestion" => nil}}
+    %{
+      "error" => %{
+        "reason" => reason,
+        "field" => field,
+        "message" => message,
+        "suggestion" => nil
+      }
+    }
   end
 end

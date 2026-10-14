@@ -40,7 +40,10 @@ defmodule AgentoWeb.Harness.Turn do
   defp loop(messages, _config, emit, 0) do
     emit.(%{
       "type" => "error",
-      "data" => %{"reason" => "max_tool_rounds", "message" => "tool loop exceeded #{@max_tool_rounds} rounds"}
+      "data" => %{
+        "reason" => "max_tool_rounds",
+        "message" => "tool loop exceeded #{@max_tool_rounds} rounds"
+      }
     })
 
     {:ok, messages}
@@ -70,7 +73,10 @@ defmodule AgentoWeb.Harness.Turn do
   defp handle_content(content, messages, config, emit, rounds) do
     case parse_tool_call(content) do
       {:tool_call, tool, action, args} ->
-        emit.(%{"type" => "tool_dispatch", "data" => %{"tool" => to_string(tool), "action" => action}})
+        emit.(%{
+          "type" => "tool_dispatch",
+          "data" => %{"tool" => to_string(tool), "action" => action}
+        })
 
         result = dispatch(tool, action, args, config.allowed_tools)
         emit.(%{"type" => "tool_result", "data" => result_frame_data(result)})

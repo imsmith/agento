@@ -4,7 +4,8 @@ defmodule AgentoWeb.Harness.RegistryTest do
 
   alias AgentoWeb.Harness.Registry
 
-  defp config, do: %{agent_type: :default, model: "m", api_host: "h", allowed_tools: :all, llm_client: Stub}
+  defp config,
+    do: %{agent_type: :default, model: "m", api_host: "h", allowed_tools: :all, llm_client: Stub}
 
   test "create returns a session with config, history, a fold of 0, and a lease" do
     {:ok, s} = Registry.create(config(), [%{role: "system", content: "sys"}], 60_000)

@@ -53,7 +53,9 @@ end
 default_bind = if config_env() == :test, do: "127.0.0.1", else: "0.0.0.0"
 
 bind =
-  case System.get_env("AGENTO_BIND", default_bind) |> String.to_charlist() |> :inet.parse_address() do
+  case System.get_env("AGENTO_BIND", default_bind)
+       |> String.to_charlist()
+       |> :inet.parse_address() do
     {:ok, ip} ->
       ip
 

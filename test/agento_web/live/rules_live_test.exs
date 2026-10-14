@@ -31,6 +31,9 @@ defmodule AgentoWeb.RulesLiveTest do
     assert html =~ "deploying from the UI is off"
     refute Enum.any?(Rules.snapshot().policies, &(&1.id == "sneak.rule"))
 
+    # gos-ui's flash_toasts keeps a stale body when the same key's message changes
+    # while the toast is showing; dismiss the first one, as a user would.
+    render_click(view, "lv:clear-flash", %{"key" => "error"})
     html = render_click(view, "unload", %{"id" => @id})
     assert html =~ "not unloaded"
     assert Enum.any?(Rules.snapshot().policies, &(&1.id == @id))

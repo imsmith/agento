@@ -7,8 +7,8 @@ defmodule AgentoWeb.SystemLiveTest do
   describe "Supervision Tree (R4.1, R4.3)" do
     test "system page mounts with supervision tree tab", %{conn: conn} do
       {:ok, _view, html} = live(conn, "/system")
-      assert html =~ "Supervision Tree"
-      assert html =~ "ETS Tables"
+      assert html =~ "Supervision tree"
+      assert html =~ "ETS tables"
       assert html =~ "DurableLog"
     end
 
@@ -18,6 +18,7 @@ defmodule AgentoWeb.SystemLiveTest do
       # Click refresh to load tree data
       view |> element("button[phx-click=refresh]") |> render_click()
 
+      assert has_element?(view, "[data-step=low]", "OK")
       html = render(view)
       # Should show LLMAgent.Supervisor as root
       assert html =~ "LLMAgent.Supervisor" or html =~ "Supervisor"
@@ -31,9 +32,8 @@ defmodule AgentoWeb.SystemLiveTest do
 
       view |> element("button[phx-click=refresh]") |> render_click()
 
-      html = render(view)
       # The DynamicSupervisor children should include our test agent
-      assert html =~ "alive"
+      assert has_element?(view, "[data-step=low]", "OK")
     end
 
     test "agent appears/disappears in tree on start/stop", %{conn: conn} do
@@ -45,7 +45,7 @@ defmodule AgentoWeb.SystemLiveTest do
 
       view |> element("button[phx-click=refresh]") |> render_click()
       html = render(view)
-      assert html =~ "tree_test_dynamic" or html =~ "alive"
+      assert html =~ "tree_test_dynamic"
 
       # Stop it
       LLMAgent.AgentSupervisor.stop_agent(:tree_test_dynamic)
@@ -76,7 +76,7 @@ defmodule AgentoWeb.SystemLiveTest do
 
       html = render(view)
       # Should list the memory table
-      assert html =~ "llmagent_mem_ets_test_agent" or html =~ "ETS Tables"
+      assert html =~ "llmagent_mem_ets_test_agent" or html =~ "ETS tables"
     end
 
     test "clicking a table shows its entries", %{conn: conn} do
@@ -200,8 +200,7 @@ defmodule AgentoWeb.SystemLiveTest do
         |> element("[phx-click=select_durable_agent][phx-value-agent=durable_test_browse]")
         |> render_click()
 
-        html = render(view)
-        assert html =~ "Event Count" or html =~ "Message Count"
+        assert has_element?(view, ".ds-stat__label", "Event count")
       end
     end
   end

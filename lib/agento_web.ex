@@ -90,6 +90,7 @@ defmodule AgentoWeb do
 
       # Design-system components (imsmith/gos-ui)
       use GosUi
+      import AgentoWeb.DS
 
       # Common modules used in templates
       alias Phoenix.LiveView.JS

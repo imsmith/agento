@@ -109,38 +109,40 @@ defmodule AgentoWeb.HubLive do
             <.empty :if={@status.performers == []}>
               No performers are advertising on the network.
             </.empty>
-            <table :if={@status.performers != []} class="ds-table ds-table--compact">
-              <thead>
-                <tr>
-                  <th class="ds-table__th">Host</th>
-                  <th class="ds-table__th">Serving</th>
-                  <th class="ds-table__th ds-table__th--num">Context</th>
-                  <th class="ds-table__th ds-table__th--num">Slots</th>
-                  <th class="ds-table__th">Found by</th>
-                  <th class="ds-table__th ds-table__th--num">Lease</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  :for={p <- @status.performers}
-                  id={dom_id("performer", p.host || p.id)}
-                  class="ds-table__row"
-                >
-                  <td class="ds-table__td">
-                    <span class="ds-data">{p.host}</span>
-                    <.tag :if={p.default} accent class="ml-0.5">default</.tag>
-                    <div class="text-caption text-muted ds-data">{p.address}</div>
-                  </td>
-                  <td class="ds-table__td"><span class="ds-data text-caption">{p.model}</span></td>
-                  <td class="ds-table__td ds-table__td--num">{p.context}</td>
-                  <td class="ds-table__td ds-table__td--num">{p.slots}</td>
-                  <td class="ds-table__td"><span class="text-caption">{p.source}</span></td>
-                  <td class="ds-table__td ds-table__td--num">
-                    <span class="text-caption">{p.lease}</span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            <div :if={@status.performers != []} class="overflow-x-auto">
+              <table class="ds-table ds-table--compact">
+                <thead>
+                  <tr>
+                    <th class="ds-table__th">Host</th>
+                    <th class="ds-table__th">Serving</th>
+                    <th class="ds-table__th ds-table__th--num">Context</th>
+                    <th class="ds-table__th ds-table__th--num">Slots</th>
+                    <th class="ds-table__th">Found by</th>
+                    <th class="ds-table__th ds-table__th--num">Lease</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    :for={p <- @status.performers}
+                    id={dom_id("performer", p.host || p.id)}
+                    class="ds-table__row"
+                  >
+                    <td class="ds-table__td">
+                      <span class="ds-data">{p.host}</span>
+                      <.tag :if={p.default} accent class="ml-0.5">default</.tag>
+                      <div class="text-caption text-muted ds-data">{p.address}</div>
+                    </td>
+                    <td class="ds-table__td"><span class="ds-data text-caption">{p.model}</span></td>
+                    <td class="ds-table__td ds-table__td--num">{p.context}</td>
+                    <td class="ds-table__td ds-table__td--num">{p.slots}</td>
+                    <td class="ds-table__td"><span class="text-caption">{p.source}</span></td>
+                    <td class="ds-table__td ds-table__td--num">
+                      <span class="text-caption">{p.lease}</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </.card>
 
           <div class="space-y-2">
@@ -152,10 +154,10 @@ defmodule AgentoWeb.HubLive do
                 <li
                   :for={c <- @status.clients}
                   id={dom_id("client", c.name)}
-                  class="flex justify-between"
+                  class="flex justify-between gap-1"
                 >
-                  <span class="ds-data">{c.name}</span>
-                  <span class="text-caption text-muted">{c.reach}</span>
+                  <span class="ds-data shrink-0">{c.name}</span>
+                  <span class="text-caption text-muted text-right">{c.reach}</span>
                 </li>
               </ul>
             </.card>
@@ -181,36 +183,42 @@ defmodule AgentoWeb.HubLive do
 
         <.card title={"Recent turns (#{length(@turns)})"} density={:compact}>
           <.empty :if={@turns == []}>No turns yet.</.empty>
-          <table :if={@turns != []} class="ds-table ds-table--dense">
-            <thead>
-              <tr>
-                <th class="ds-table__th">Time (UTC)</th>
-                <th class="ds-table__th">Client</th>
-                <th class="ds-table__th">Asked for</th>
-                <th class="ds-table__th">Served by</th>
-                <th class="ds-table__th">Outcome</th>
-                <th class="ds-table__th ds-table__th--num">Tokens in</th>
-                <th class="ds-table__th ds-table__th--num">Tokens out</th>
-                <th class="ds-table__th ds-table__th--num">Took</th>
-              </tr>
-            </thead>
-            <tbody id="turns">
-              <tr :for={t <- @turns} class="ds-table__row">
-                <td class="ds-table__td">{clock(t.at)}</td>
-                <td class="ds-table__td">{t.client}</td>
-                <td class="ds-table__td">{t.requested_model}</td>
-                <td class="ds-table__td">{t.performer_model}</td>
-                <td class="ds-table__td">
-                  <.status_badge step={DS.step(t.outcome)} label={outcome_word(t.outcome)} size={12} />
-                  <span :if={t.stop_reason} class="text-caption text-muted ml-0.5">{t.stop_reason}</span>
-                  <div :if={t.error} class="text-caption text-status-critical">{t.error}</div>
-                </td>
-                <td class="ds-table__td ds-table__td--num">{t.input_tokens}</td>
-                <td class="ds-table__td ds-table__td--num">{t.output_tokens}</td>
-                <td class="ds-table__td ds-table__td--num">{duration(t.duration_ms)}</td>
-              </tr>
-            </tbody>
-          </table>
+          <div :if={@turns != []} class="overflow-x-auto">
+            <table class="ds-table ds-table--dense">
+              <thead>
+                <tr>
+                  <th class="ds-table__th">Time (UTC)</th>
+                  <th class="ds-table__th">Client</th>
+                  <th class="ds-table__th">Asked for</th>
+                  <th class="ds-table__th">Served by</th>
+                  <th class="ds-table__th">Outcome</th>
+                  <th class="ds-table__th ds-table__th--num">Tokens in</th>
+                  <th class="ds-table__th ds-table__th--num">Tokens out</th>
+                  <th class="ds-table__th ds-table__th--num">Took</th>
+                </tr>
+              </thead>
+              <tbody id="turns">
+                <tr :for={t <- @turns} class="ds-table__row">
+                  <td class="ds-table__td">{clock(t.at)}</td>
+                  <td class="ds-table__td">{t.client}</td>
+                  <td class="ds-table__td">{t.requested_model}</td>
+                  <td class="ds-table__td">{t.performer_model}</td>
+                  <td class="ds-table__td">
+                    <.status_badge
+                      step={DS.step(t.outcome)}
+                      label={outcome_word(t.outcome)}
+                      size={12}
+                    />
+                    <span :if={t.stop_reason} class="text-caption text-muted ml-0.5">{t.stop_reason}</span>
+                    <div :if={t.error} class="text-caption text-status-critical">{t.error}</div>
+                  </td>
+                  <td class="ds-table__td ds-table__td--num">{t.input_tokens}</td>
+                  <td class="ds-table__td ds-table__td--num">{t.output_tokens}</td>
+                  <td class="ds-table__td ds-table__td--num">{duration(t.duration_ms)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </.card>
       </div>
     </.app>

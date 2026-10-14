@@ -55,7 +55,7 @@
   --font-weight-bold: 700;
 }
 
-@theme inline {
+@theme inline reference {
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-surface-raised: var(--surface-raised);

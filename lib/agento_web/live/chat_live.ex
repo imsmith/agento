@@ -263,111 +263,68 @@ defmodule AgentoWeb.ChatLive do
   def render(assigns) do
     ~H"""
     <.app flash={@flash} active_nav={:chat}>
-      <div class="flex h-full">
+      <div class="flex h-full gap-2">
         <%!-- Agent sidebar --%>
-        <aside class="w-64 border-r border-base-300 bg-base-200 flex flex-col overflow-hidden">
-          <div class="p-3 border-b border-base-300 flex items-center justify-between">
-            <span class="font-semibold text-sm">Agents</span>
-            <div class="flex gap-1">
-              <button phx-click="refresh_agents" class="btn btn-ghost btn-xs" title="Refresh">
-                <.icon name="hero-arrow-path-mini" class="size-4" />
-              </button>
-              <button phx-click="toggle_new_agent_form" class="btn btn-ghost btn-xs" title="New agent">
-                <.icon name="hero-plus-mini" class="size-4" />
-              </button>
-            </div>
-          </div>
+        <.card title="Agents" density={:compact} flush class="w-32 flex flex-col min-h-0">
+          <:actions>
+            <.button size={:sm} icon="m-refresh" phx-click="refresh_agents" title="Refresh">Refresh</.button>
+            <.button size={:sm} icon="m-add" phx-click="toggle_new_agent_form" title="New agent">New</.button>
+          </:actions>
 
-          <%= if @show_new_agent_form do %>
-            <div class="p-3 border-b border-base-300 bg-base-100 space-y-2">
-              <.new_agent_form form={@new_agent_form} endpoint_options={@endpoint_options} />
-            </div>
-          <% end %>
+          <div :if={@show_new_agent_form} class="p-1 border-b border-border">
+            <.new_agent_form form={@new_agent_form} endpoint_options={@endpoint_options} />
+          </div>
 
           <div class="flex-1 overflow-y-auto">
-            <%= if @agents == [] do %>
-              <p class="p-3 text-sm text-base-content/50">No agents running.</p>
-            <% else %>
-              <%= for agent <- @agents do %>
-                <div
-                  phx-click="select_agent"
-                  phx-value-name={agent.name}
-                  class={[
-                    "p-3 cursor-pointer border-b border-base-300 hover:bg-base-300/50",
-                    @selected_agent && @selected_agent.name == agent.name && "bg-base-300"
-                  ]}
-                >
-                  <div class="font-medium text-sm">{agent.name}</div>
-                  <div class="text-xs text-base-content/60">
-                    {agent.role} / {agent.model}
-                  </div>
-                  <%= if to_string(agent.name) == @confirm_stop do %>
-                    <div class="mt-1 flex gap-1">
-                      <button
-                        phx-click="stop_agent"
-                        phx-value-name={agent.name}
-                        class="btn btn-error btn-xs"
-                      >
-                        Confirm stop
-                      </button>
-                      <button phx-click="cancel_stop" class="btn btn-ghost btn-xs">Cancel</button>
-                    </div>
-                  <% else %>
-                    <button
-                      phx-click="confirm_stop"
-                      phx-value-name={agent.name}
-                      class="btn btn-ghost btn-xs mt-1 text-error"
-                    >
-                      Stop
-                    </button>
-                  <% end %>
+            <.empty :if={@agents == []}>No agents running.</.empty>
+            <div
+              :for={agent <- @agents}
+              phx-click="select_agent"
+              phx-value-name={agent.name}
+              class={[
+                "p-1 cursor-pointer border-b border-border hover:bg-surface-raised",
+                @selected_agent && @selected_agent.name == agent.name && "bg-surface-raised"
+              ]}
+              aria-current={@selected_agent && @selected_agent.name == agent.name && "true"}
+            >
+              <div class="font-medium text-small">{agent.name}</div>
+              <div class="text-caption text-muted">{agent.role} / {agent.model}</div>
+              <%= if to_string(agent.name) == @confirm_stop do %>
+                <div class="mt-0.5 flex gap-0.5">
+                  <.button size={:sm} variant={:danger} phx-click="stop_agent" phx-value-name={agent.name}>Stop {agent.name}</.button>
+                  <.button size={:sm} phx-click="cancel_stop">Cancel</.button>
                 </div>
+              <% else %>
+                <.button size={:sm} class="mt-0.5" phx-click="confirm_stop" phx-value-name={agent.name}>Stop</.button>
               <% end %>
-            <% end %>
+            </div>
           </div>
-        </aside>
+        </.card>
 
         <%!-- Chat panel --%>
-        <div class="flex-1 flex flex-col">
+        <div class="flex-1 flex flex-col min-h-0">
           <%= if @selected_agent do %>
-            <%!-- Chat header --%>
-            <div class="p-3 border-b border-base-300 flex items-center justify-between bg-base-100">
+            <div class="p-1 border-b border-border flex items-center justify-between">
               <div>
                 <span class="font-bold">{@selected_agent.name}</span>
-                <span class="text-sm text-base-content/60 ml-2">
-                  {@selected_agent.role} / {@selected_agent.model}
-                </span>
+                <span class="text-small text-muted ml-1">{@selected_agent.role} / {@selected_agent.model}</span>
               </div>
-              <div class="flex gap-1">
-                <button phx-click="show_config" class="btn btn-ghost btn-xs">
-                  <.icon name="hero-cog-6-tooth-mini" class="size-4" /> Config
-                </button>
+              <div class="flex gap-0.5">
+                <.button size={:sm} icon="m-settings" phx-click="show_config">Config</.button>
                 <%= if @confirm_clear do %>
-                  <button phx-click="clear_history" class="btn btn-error btn-xs">
-                    Confirm clear
-                  </button>
-                  <button phx-click="cancel_clear" class="btn btn-ghost btn-xs">Cancel</button>
+                  <.button size={:sm} variant={:danger} phx-click="clear_history">Clear history for {@selected_agent.name}</.button>
+                  <.button size={:sm} phx-click="cancel_clear">Cancel</.button>
                 <% else %>
-                  <button phx-click="confirm_clear" class="btn btn-ghost btn-xs text-warning">
-                    <.icon name="hero-trash-mini" class="size-4" /> Clear
-                  </button>
+                  <.button size={:sm} icon="m-delete" phx-click="confirm_clear">Clear</.button>
                 <% end %>
               </div>
             </div>
 
-            <%!-- Agent config panel (R2.3) --%>
-            <%= if @show_agent_config do %>
-              <div class="p-3 border-b border-base-300 bg-base-200 text-sm font-mono">
-                <.agent_config agent={@selected_agent} />
-              </div>
-            <% end %>
+            <div :if={@show_agent_config} class="p-1 border-b border-border bg-surface">
+              <.agent_config agent={@selected_agent} />
+            </div>
 
-            <%!-- Messages --%>
-            <div
-              class="flex-1 overflow-y-auto p-4 space-y-3"
-              id="chat-messages"
-              phx-hook="ScrollBottom"
-            >
+            <div class="flex-1 overflow-y-auto p-2 space-y-1.5" id="chat-messages" phx-hook="ScrollBottom">
               <%= for item <- interleave_messages_and_events(@messages, @events_inline) do %>
                 <%= case item do %>
                   <% {:message, msg} -> %>
@@ -381,39 +338,21 @@ defmodule AgentoWeb.ChatLive do
                 <% end %>
               <% end %>
 
-              <%= if @thinking do %>
-                <div class="chat chat-start">
-                  <div class="chat-bubble chat-bubble-neutral">
-                    <span class="loading loading-dots loading-sm"></span>
-                  </div>
-                </div>
-              <% end %>
+              <div :if={@thinking} class="chat-msg" aria-busy="true">
+                <.mark name="m-refresh" size={14} class="ds-btn__spin" label="thinking" /> thinking
+              </div>
             </div>
 
-            <%!-- Input --%>
-            <form phx-submit="send_prompt" class="p-3 border-t border-base-300 bg-base-100">
-              <div class="flex gap-2">
-                <input
-                  type="text"
-                  name="prompt"
-                  value={@prompt_text}
-                  phx-change="update_prompt"
-                  placeholder="Type a message..."
-                  class="input input-bordered flex-1"
-                  autocomplete="off"
-                />
-                <button type="submit" class="btn btn-primary" disabled={@prompt_text == ""}>
-                  <.icon name="hero-paper-airplane-mini" class="size-4" /> Send
-                </button>
+            <form phx-submit="send_prompt" class="p-1 border-t border-border">
+              <div class="flex gap-1">
+                <.input name="prompt" value={@prompt_text} phx-change="update_prompt" placeholder="Type a message..." autocomplete="off" class="flex-1" />
+                <.button type="submit" variant={:primary} icon="m-send" disabled={@prompt_text == ""}>Send</.button>
               </div>
             </form>
           <% else %>
-            <div class="flex-1 flex items-center justify-center text-base-content/40">
-              <div class="text-center">
-                <.icon name="hero-chat-bubble-left-right" class="size-12 mx-auto mb-2" />
-                <p>Select an agent from the sidebar to begin chatting.</p>
-              </div>
-            </div>
+            <.state_panel mode={:empty} mark="m-chat" title="No agent selected.">
+              Pick an agent on the left to begin chatting.
+            </.state_panel>
           <% end %>
         </div>
       </div>
@@ -425,172 +364,76 @@ defmodule AgentoWeb.ChatLive do
 
   defp chat_message(assigns) do
     ~H"""
-    <div class={["chat", role_alignment(@message.role)]}>
-      <div class="chat-header text-xs opacity-60 mb-1">
-        {@message.role}
-      </div>
-      <div class={["chat-bubble", role_bubble_class(@message.role)]}>
-        <div class="whitespace-pre-wrap">{@message.content}</div>
-      </div>
+    <div class={["chat-msg", role_class(@message.role)]}>
+      <div class="chat-role">{@message.role}</div>
+      <div>{@message.content}</div>
     </div>
     """
   end
 
   defp tool_dispatch_block(assigns) do
     ~H"""
-    <div class="collapse collapse-arrow bg-info/10 border border-info/30 rounded-lg my-1">
-      <input type="checkbox" />
-      <div class="collapse-title text-sm font-medium flex items-center gap-2 py-2 min-h-0">
-        <.icon name="hero-wrench-screwdriver-mini" class="size-4 text-info" />
-        Tool: {@event.data[:tool] || @event.data["tool"]} / {@event.data[:action] ||
-          @event.data["action"]}
-      </div>
-      <div class="collapse-content text-xs font-mono">
-        <pre class="whitespace-pre-wrap">{inspect(sanitize_event_data(@event.data), pretty: true)}</pre>
-      </div>
-    </div>
+    <.disclosure
+      icon="m-tool"
+      summary={"Tool: #{@event.data[:tool] || @event.data["tool"]} / #{@event.data[:action] || @event.data["action"]}"}
+    >
+      <.pre value={sanitize_event_data(@event.data)} />
+    </.disclosure>
     """
   end
 
   defp tool_result_block(assigns) do
+    dur = assigns.event.data[:duration_ms] || assigns.event.data["duration_ms"]
+    assigns = assign(assigns, :dur, dur)
+
     ~H"""
-    <div class="collapse collapse-arrow bg-success/10 border border-success/30 rounded-lg my-1">
-      <input type="checkbox" />
-      <div class="collapse-title text-sm font-medium flex items-center gap-2 py-2 min-h-0">
-        <.icon name="hero-check-circle-mini" class="size-4 text-success" />
-        Tool result: {@event.data[:result] || @event.data["result"]}
-        <%= if dur = @event.data[:duration_ms] || @event.data["duration_ms"] do %>
-          <span class="text-xs opacity-60">({dur}ms)</span>
-        <% end %>
-      </div>
-      <div class="collapse-content text-xs font-mono">
-        <pre class="whitespace-pre-wrap">{inspect(sanitize_event_data(@event.data), pretty: true)}</pre>
-      </div>
-    </div>
+    <.disclosure
+      icon="m-low"
+      step={:low}
+      summary={"Tool result: #{@event.data[:result] || @event.data["result"]}#{if @dur, do: " (#{@dur} ms)", else: ""}"}
+    >
+      <.pre value={sanitize_event_data(@event.data)} />
+    </.disclosure>
     """
   end
 
   defp error_block(assigns) do
     ~H"""
-    <div class="alert alert-error text-sm my-1">
-      <.icon name="hero-exclamation-triangle-mini" class="size-4" />
-      <div>
-        <div class="font-medium">
-          Error: {@event.data[:reason] || @event.data["reason"]}
-        </div>
-        <div class="text-xs opacity-70">
-          Source: {@event.data[:source] || @event.data["source"]}
-        </div>
-      </div>
-    </div>
+    <.alert severity={:critical} title={"Error: #{@event.data[:reason] || @event.data["reason"]}"} class="my-0.5">
+      Source: {@event.data[:source] || @event.data["source"]}
+    </.alert>
     """
   end
 
   defp agent_config(assigns) do
     ~H"""
-    <table class="table table-xs">
-      <tbody>
-        <tr>
-          <td class="font-semibold">Name</td>
-          <td>{@agent.name}</td>
-        </tr>
-        <tr>
-          <td class="font-semibold">Role</td>
-          <td>{@agent.role}</td>
-        </tr>
-        <tr>
-          <td class="font-semibold">Model</td>
-          <td>{@agent.model}</td>
-        </tr>
-        <tr>
-          <td class="font-semibold">API Host</td>
-          <td>{@agent.api_host}</td>
-        </tr>
-        <tr>
-          <td class="font-semibold">LLM Client</td>
-          <td>{inspect(@agent.llm_client)}</td>
-        </tr>
-        <tr>
-          <td class="font-semibold">Memory</td>
-          <td>{inspect(@agent.memory)}</td>
-        </tr>
-        <tr>
-          <td class="font-semibold">History Length</td>
-          <td>{@agent.history_length}</td>
-        </tr>
-      </tbody>
-    </table>
+    <.key_value density={:dense} columns={2}>
+      <:item key="Name">{@agent.name}</:item>
+      <:item key="Role">{@agent.role}</:item>
+      <:item key="Model">{@agent.model}</:item>
+      <:item key="API host">{@agent.api_host}</:item>
+      <:item key="LLM client">{inspect(@agent.llm_client)}</:item>
+      <:item key="Memory">{inspect(@agent.memory)}</:item>
+      <:item key="History length" num>{@agent.history_length}</:item>
+    </.key_value>
     """
   end
 
   defp new_agent_form(assigns) do
     ~H"""
-    <form id="new-agent-form" phx-submit="start_agent" phx-change="update_new_agent" class="space-y-2">
-      <input
-        type="text"
-        name="name"
-        value={@form.name}
-        placeholder="Agent name (atom)"
-        class="input input-bordered input-sm w-full"
-        required
-      />
-      <select
-        name="role"
-        class="select select-bordered select-sm w-full"
-      >
-        <option :for={role <- available_roles()} value={role} selected={role == @form.role}>
-          {role}
-        </option>
-      </select>
-      <select
-        name="endpoint"
-        class="select select-bordered select-sm w-full"
-      >
-        <option
-          :for={ep <- @endpoint_options}
-          value={ep.id}
-          selected={ep.id == @form.endpoint_id}
-        >
-          {ep.label}
-        </option>
-      </select>
+    <form id="new-agent-form" phx-submit="start_agent" phx-change="update_new_agent" class="space-y-1">
+      <.input name="name" value={@form.name} placeholder="Agent name (atom)" required />
+      <.select name="role" options={available_roles()} value={@form.role} />
+      <.select name="endpoint" options={Enum.map(@endpoint_options, &{&1.label, &1.id})} value={@form.endpoint_id} />
       <%= if @form.endpoint_id == "manual" do %>
-        <input
-          type="text"
-          name="model"
-          value={@form.model}
-          placeholder="Model (e.g. llama3.2)"
-          class="input input-bordered input-sm w-full"
-        />
-        <input
-          type="text"
-          name="api_host"
-          value={@form.api_host}
-          placeholder="API host (e.g. http://localhost:11434/v1)"
-          class="input input-bordered input-sm w-full"
-        />
+        <.input name="model" value={@form.model} placeholder="Model (e.g. llama3.2)" />
+        <.input name="api_host" value={@form.api_host} placeholder="API host (e.g. http://localhost:11434/v1)" />
       <% end %>
-      <select
-        name="llm_client"
-        class="select select-bordered select-sm w-full"
-      >
-        <option :for={mod <- llm_client_options()} value={mod} selected={mod == @form.llm_client}>
-          {mod}
-        </option>
-      </select>
-      <select
-        name="memory"
-        class="select select-bordered select-sm w-full"
-      >
-        <option :for={mod <- memory_options()} value={mod} selected={mod == @form.memory}>
-          {mod}
-        </option>
-      </select>
-      <div class="flex gap-1">
-        <button type="submit" class="btn btn-primary btn-sm flex-1">Start</button>
-        <button type="button" phx-click="toggle_new_agent_form" class="btn btn-ghost btn-sm">
-          Cancel
-        </button>
+      <.select name="llm_client" options={llm_client_options()} value={@form.llm_client} />
+      <.select name="memory" options={memory_options()} value={@form.memory} />
+      <div class="flex gap-0.5">
+        <.button type="submit" variant={:primary} size={:sm} class="flex-1">Start</.button>
+        <.button type="button" size={:sm} phx-click="toggle_new_agent_form">Cancel</.button>
       </div>
     </form>
     """
@@ -661,12 +504,9 @@ defmodule AgentoWeb.ChatLive do
     msg_items ++ events
   end
 
-  defp role_alignment(role) when role in ["user", :user], do: "chat-end"
-  defp role_alignment(_), do: "chat-start"
-
-  defp role_bubble_class(role) when role in ["user", :user], do: "chat-bubble-primary"
-  defp role_bubble_class(role) when role in ["system", :system], do: "chat-bubble-neutral"
-  defp role_bubble_class(_), do: "chat-bubble-secondary"
+  defp role_class(role) when role in ["user", :user], do: "chat-msg--user"
+  defp role_class(role) when role in ["system", :system], do: "chat-msg--system"
+  defp role_class(_), do: nil
 
   # Always-present fallback so the endpoint select is never empty, even
   # before mDNS discovery has surfaced any LAN servers.

@@ -107,6 +107,8 @@ defmodule AgentoWeb.ChatLiveTest do
       |> form("form[phx-submit=send_prompt]", %{"prompt" => "hello world"})
       |> render_submit()
 
+      assert has_element?(view, "#chat-messages .chat-msg--user", "hello world")
+
       html = render(view)
       # Prompt text should be cleared and thinking indicator shown.
       assert html =~ "loading" or html =~ "chat_test_prompt"
@@ -205,6 +207,7 @@ defmodule AgentoWeb.ChatLiveTest do
 
       assert has_element?(view, "select[name=llm_client]")
       assert has_element?(view, "select[name=memory]")
+      for name <- ~w(role endpoint llm_client memory), do: assert(has_element?(view, "select[name=#{name}]"))
     end
 
     test "manual endpoint entry reveals model and api_host fields (R2.1)", %{conn: conn} do
@@ -260,11 +263,11 @@ defmodule AgentoWeb.ChatLiveTest do
       |> element("[phx-click=confirm_stop][phx-value-name=chat_test_cancel_stop]")
       |> render_click()
 
-      assert render(view) =~ "Confirm stop"
+      assert render(view) =~ "Stop chat_test_cancel_stop"
 
       # Cancel
       view |> element("button[phx-click=cancel_stop]") |> render_click()
-      refute render(view) =~ "Confirm stop"
+      refute render(view) =~ "Stop chat_test_cancel_stop"
     end
   end
 end

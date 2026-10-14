@@ -5,9 +5,6 @@ defmodule AgentoWeb.ToolsLive do
   """
   use AgentoWeb, :live_view
 
-  # gos-ui's button/input supersede the daisyUI ones of the same name
-  import AgentoWeb.CoreComponents, only: []
-
   alias AgentoWeb.Discovery.Tools
 
   @impl true

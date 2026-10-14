@@ -106,5 +106,40 @@ defmodule AgentoWeb.ToolsLiveTest do
       {:ok, _view, html} = live(conn, "/tools")
       assert html =~ "test_dynamic"
     end
+
+    test "a successful invocation is a low-severity alert with the result", %{conn: conn} do
+      {:module, mod, _, _} =
+        Module.create(
+          :"Elixir.LLMAgent.Tools.TestDynamic",
+          quote do
+            @behaviour LLMAgent.Tool
+            def describe, do: "A dynamic test tool for VA1"
+            def perform(_, _), do: {:ok, %{output: "dynamic", metadata: %{}}}
+          end,
+          Macro.Env.location(__ENV__)
+        )
+
+      LLMAgent.Tools.register(:test_dynamic, mod)
+
+      on_exit(fn ->
+        try do
+          LLMAgent.Tools.unregister(:test_dynamic)
+        catch
+          _, _ -> :ok
+        end
+
+        :code.purge(mod)
+        :code.delete(mod)
+      end)
+
+      {:ok, view, _} = live(conn, "/tools")
+      view |> element("[phx-click=select_tool][phx-value-name=test_dynamic]") |> render_click()
+      form = form(view, "form#invoke-tool-form", %{"action" => "any", "args" => "{}"})
+      render_change(form)
+      render_submit(form)
+
+      assert has_element?(view, "[data-severity=low]")
+      assert render(view) =~ "dynamic"
+    end
   end
 end

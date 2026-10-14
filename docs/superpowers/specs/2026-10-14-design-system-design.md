@@ -63,12 +63,15 @@ Then in gos-ui, branch `sync-marks`: `make sync` against that checkout,
 
 ### `assets/css/app.css`
 
-Preflight is dropped; design-system `base.css` owns element defaults.
+Preflight is dropped; design-system `base.css` owns element defaults. No
+`@layer`: `gos-ui/styles.css` is unlayered and unlayered CSS outranks any
+cascade layer, so layered utilities could never override a component padding
+or a base heading size. Unlayered, `app.css` loads after `styles.css` and wins
+on source order at equal specificity.
 
 ```css
-@layer theme, base, components, utilities;
-@import "tailwindcss/theme.css" layer(theme);
-@import "tailwindcss/utilities.css" layer(utilities) source(none);
+@import "tailwindcss/theme.css";
+@import "tailwindcss/utilities.css" source(none);
 @source "../../lib/agento_web";
 
 @theme {

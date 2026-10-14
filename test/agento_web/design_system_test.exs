@@ -47,4 +47,29 @@ defmodule AgentoWeb.DesignSystemTest do
     assert html =~ ~s(.phx-server-error #server-error)
     assert html =~ ~r/id="client-error"[^>]*\shidden/
   end
+
+  @forbidden ~w(
+    btn card badge alert navbar collapse loading toast tabs tab-active menu-item
+    table-zebra table-xs table-sm input-bordered select-bordered textarea-bordered
+    fieldset label chat chat-bubble
+    hero- bg-base- text-base-content text-xs text-sm text-lg text-xl text-2xl
+    font-semibold rounded-full rounded-box opacity-
+  )
+
+  # Every class attribute, single-line (class="...") or multi-line (class={[ ... ]}),
+  # read from the whole file so continuation lines are not missed.
+  @class_attr ~r/class=(?:"([^"]*)"|\{\s*\[(.*?)\]\s*\})/s
+
+  test "no off-system class vocabulary survives in the web tier" do
+    offenders =
+      for path <- Path.wildcard("lib/agento_web/**/*.{ex,heex}"),
+          source = File.read!(path),
+          [_whole | groups] <- Regex.scan(@class_attr, source),
+          word <- String.split(Enum.join(groups, " "), ~r/[\s"\[\],&|?:(){}=!]+/, trim: true),
+          Enum.any?(@forbidden, &(word == &1 or (String.ends_with?(&1, "-") and String.starts_with?(word, &1)))),
+          uniq: true,
+          do: "#{path}: #{word}"
+
+    assert offenders == [], Enum.join(["off-system classes:" | offenders], "\n  ")
+  end
 end

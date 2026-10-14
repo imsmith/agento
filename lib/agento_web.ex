@@ -86,7 +86,7 @@ defmodule AgentoWeb do
       # HTML escaping functionality
       import Phoenix.HTML
       # Core UI components
-      import AgentoWeb.CoreComponents, except: [button: 1, input: 1, table: 1]
+      import AgentoWeb.CoreComponents
 
       # Design-system components (imsmith/gos-ui)
       use GosUi

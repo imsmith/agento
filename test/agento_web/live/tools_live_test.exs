@@ -138,8 +138,8 @@ defmodule AgentoWeb.ToolsLiveTest do
       render_change(form)
       render_submit(form)
 
-      assert has_element?(view, "[data-severity=low]")
-      assert render(view) =~ "dynamic"
+      assert has_element?(view, "[data-severity=low]", "dynamic")
+      assert has_element?(view, "[data-severity=low] .ds-alert__title", "Invoked.")
     end
   end
 end

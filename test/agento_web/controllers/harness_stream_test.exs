@@ -13,7 +13,8 @@ defmodule AgentoWeb.HarnessStreamTest do
     })
   end
 
-  defp frames(conn), do: conn.resp_body |> String.split("\n", trim: true) |> Enum.map(&Jason.decode!/1)
+  defp frames(conn),
+    do: conn.resp_body |> String.split("\n", trim: true) |> Enum.map(&Jason.decode!/1)
 
   test "PUT streams an assistant message frame tagged with req_ts and fold", %{conn: conn} do
     s = open_session(conn)
@@ -26,7 +27,8 @@ defmodule AgentoWeb.HarnessStreamTest do
     assert msg["fold"] == "fold_1"
   end
 
-  test "PUT with a tool-triggering turn streams tool_dispatch + tool_result before the message", %{conn: conn} do
+  test "PUT with a tool-triggering turn streams tool_dispatch + tool_result before the message",
+       %{conn: conn} do
     s = open_session(conn)
     conn = put_turn(conn, s["session_id"], s["fold"], "use_tool")
 

@@ -4,7 +4,9 @@ defmodule AgentoWeb.Harness.SessionTest do
 
   alias AgentoWeb.Harness.{Registry, Session}
 
-  defp config, do: %{agent_type: :default, model: "m", api_host: "h", allowed_tools: :all, llm_client: Stub}
+  defp config,
+    do: %{agent_type: :default, model: "m", api_host: "h", allowed_tools: :all, llm_client: Stub}
+
   defp create, do: Registry.create(config(), [], 60_000)
 
   test "fold token round-trips" do

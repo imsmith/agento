@@ -25,7 +25,8 @@ defmodule AgentoWeb.Harness.Registry do
 
   @doc "Create a session with the given config + initial history; returns the public record."
   @spec create(map(), [map()], pos_integer()) :: {:ok, session()}
-  def create(config, history, ttl_ms), do: GenServer.call(__MODULE__, {:create, config, history, ttl_ms})
+  def create(config, history, ttl_ms),
+    do: GenServer.call(__MODULE__, {:create, config, history, ttl_ms})
 
   @spec lookup(String.t()) :: {:ok, session()} | {:error, :not_found}
   def lookup(id), do: GenServer.call(__MODULE__, {:lookup, id})

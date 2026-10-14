@@ -68,7 +68,10 @@ defmodule AgentoWeb.Harness.Session do
   end
 
   @spec reconcile(String.t(), String.t(), list()) ::
-          {:process, String.t()} | {:replay, [map()]} | {:diverged, String.t()} | {:error, :not_found}
+          {:process, String.t()}
+          | {:replay, [map()]}
+          | {:diverged, String.t()}
+          | {:error, :not_found}
   def reconcile(session_id, fold_str, context) do
     case Registry.current_fold(session_id) do
       {:error, :not_found} ->

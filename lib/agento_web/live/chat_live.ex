@@ -525,7 +525,7 @@ defmodule AgentoWeb.ChatLive do
 
   defp new_agent_form(assigns) do
     ~H"""
-    <form phx-submit="start_agent" phx-change="update_new_agent" class="space-y-2">
+    <form id="new-agent-form" phx-submit="start_agent" phx-change="update_new_agent" class="space-y-2">
       <input
         type="text"
         name="name"

@@ -323,7 +323,7 @@ defmodule AgentoWeb.EventsLive do
     <div class="flex flex-col h-full">
       <%!-- Filters --%>
       <div class="p-3 border-b border-base-300 bg-base-100">
-        <form phx-change="update_filter" class="flex gap-2 items-end flex-wrap">
+        <form id="event-filter-form" phx-change="update_filter" class="flex gap-2 items-end flex-wrap">
           <div>
             <label class="label text-xs">Topic</label>
             <select name="topic" class="select select-bordered select-sm">
@@ -483,6 +483,7 @@ defmodule AgentoWeb.EventsLive do
       <div class="p-4 border-b border-base-300 bg-base-100">
         <h3 class="font-semibold mb-2">DurableLog Query (R3.3)</h3>
         <form
+          id="durable-query-form"
           phx-submit="query_durable_log"
           phx-change="update_durable_query"
           class="flex gap-2 items-end"
@@ -553,6 +554,7 @@ defmodule AgentoWeb.EventsLive do
       <div class="p-4 border-b border-base-300 bg-base-100">
         <h3 class="font-semibold mb-2">EventLog Query (R3.4, in-memory)</h3>
         <form
+          id="eventlog-query-form"
           phx-submit="query_event_log"
           phx-change="update_eventlog_query"
           class="flex gap-2 items-end"

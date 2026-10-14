@@ -8,7 +8,8 @@ defmodule AgentoWeb.EventsLiveTest do
 
   # Builds a live-stream message shaped like the EventBusBridge PubSub payload.
   defp stream_event(topic, type, data, timestamp) do
-    {topic, %EventStruct{topic: topic, type: type, data: data, source: :test, timestamp: timestamp}}
+    {topic,
+     %EventStruct{topic: topic, type: type, data: data, source: :test, timestamp: timestamp}}
   end
 
   # Finds the phx-value-index of the stream row whose timestamp cell matches ts.
@@ -116,7 +117,12 @@ defmodule AgentoWeb.EventsLiveTest do
       # Use a unique past timestamp so we can locate this event's row index
       # regardless of unrelated web.* events that arrive in the live stream.
       marker_ts = "2026-07-14T12:00:00Z"
-      send(view.pid, stream_event("agent.message", :message, %{secret_marker: "expand-me-123"}, marker_ts))
+
+      send(
+        view.pid,
+        stream_event("agent.message", :message, %{secret_marker: "expand-me-123"}, marker_ts)
+      )
+
       # Let any in-flight web.mount from connect settle so the row index is stable.
       Process.sleep(150)
       html = render(view)
@@ -128,12 +134,18 @@ defmodule AgentoWeb.EventsLiveTest do
       # Expand: use render_click's return value, which reflects state at the
       # click (before any async web.event from this interaction shifts indices).
       idx = row_index_for(html, marker_ts)
-      expanded = view |> element("[phx-click=toggle_row][phx-value-index='#{idx}']") |> render_click()
+
+      expanded =
+        view |> element("[phx-click=toggle_row][phx-value-index='#{idx}']") |> render_click()
+
       assert expanded =~ "expand-me-123"
 
       # Collapse: recompute the index against the just-rendered DOM.
       idx = row_index_for(expanded, marker_ts)
-      collapsed = view |> element("[phx-click=toggle_row][phx-value-index='#{idx}']") |> render_click()
+
+      collapsed =
+        view |> element("[phx-click=toggle_row][phx-value-index='#{idx}']") |> render_click()
+
       refute collapsed =~ "expand-me-123"
     end
   end
@@ -149,8 +161,16 @@ defmodule AgentoWeb.EventsLiveTest do
     test "from filter excludes events older than the boundary", %{conn: conn} do
       {:ok, view, _html} = live(conn, "/events")
 
-      send(view.pid, stream_event("agent.message", :message, %{tag: "old-evt"}, "2026-07-14T10:00:00Z"))
-      send(view.pid, stream_event("agent.message", :message, %{tag: "new-evt"}, "2026-07-14T14:00:00Z"))
+      send(
+        view.pid,
+        stream_event("agent.message", :message, %{tag: "old-evt"}, "2026-07-14T10:00:00Z")
+      )
+
+      send(
+        view.pid,
+        stream_event("agent.message", :message, %{tag: "new-evt"}, "2026-07-14T14:00:00Z")
+      )
+
       # Both visible initially (topic is a shown column value)
       assert render(view) =~ "2026-07-14T10:00:00Z"
       assert render(view) =~ "2026-07-14T14:00:00Z"

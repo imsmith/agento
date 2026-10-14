@@ -73,9 +73,7 @@ defmodule AgentoWeb.Discovery.Endpoints do
 
   defp query_ads do
     {:ok, ads} =
-      LLMAgent.Tools.Discovery.find_all(
-        LLMAgent.ToolQuery.new(%{coordinate: @coordinate})
-      )
+      LLMAgent.Tools.Discovery.find_all(LLMAgent.ToolQuery.new(%{coordinate: @coordinate}))
 
     ads
   rescue
@@ -91,7 +89,13 @@ defmodule AgentoWeb.Discovery.Endpoints do
 
       normalized ->
         model = payload[:model] || get_in(ad.operational || %{}, [:model_id]) || ""
-        %{id: to_string(id), api_host: normalized, model: model, label: "#{model} @ #{normalized}"}
+
+        %{
+          id: to_string(id),
+          api_host: normalized,
+          model: model,
+          label: "#{model} @ #{normalized}"
+        }
     end
   end
 

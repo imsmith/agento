@@ -48,26 +48,19 @@ defmodule Agento.MixProject do
       {:lazy_html, ">= 0.1.0", only: :test},
       {:esbuild, "~> 0.10", runtime: Mix.env() == :dev},
       {:tailwind, "~> 0.3", runtime: Mix.env() == :dev},
-      {:heroicons,
-       github: "tailwindlabs/heroicons",
-       tag: "v2.2.0",
-       sparse: "optimized",
-       app: false,
-       compile: false,
-       depth: 1},
       {:telemetry_metrics, "~> 1.0"},
       {:telemetry_poller, "~> 1.0"},
       {:gettext, "~> 1.0", override: true},
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.3"},
       {:bandit, "~> 1.5"},
+      {:gos_ui, github: "imsmith/gos-ui", ref: "9defdfb9b0bde162b9c32970b3a1ca65ea3f717d"},
       {:LLMAgent, path: "../llmagent"},
       # Comn comes transitively through LLMAgent
       # Hub: edn configuration and the SQLite turn log
       {:ex_edn, path: "../ex_edn", override: true},
       {:anemos, path: "../anemos", override: true},
       {:exqlite, "~> 0.27"},
-      {:bypass, "~> 2.1", only: :test},
       # Not in test: a test run must not announce itself in the directory.
       {:busybody, path: "../busybody", only: [:dev, :prod]}
     ]

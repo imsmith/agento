@@ -79,6 +79,13 @@ defmodule AgentoWeb.HubLiveTest do
     assert html =~ "is not advertising"
   end
 
+  test "warns when no default host is configured", %{conn: conn} do
+    Agento.Hub.Config.put(%{Agento.Hub.Config.get() | default_host: nil})
+    {:ok, view, _html} = live(conn, "/hub")
+
+    assert has_element?(view, "[data-severity=medium]", "No default host is configured")
+  end
+
   test "picks up a performer that appears after the page loaded", %{conn: conn} do
     {:ok, view, html} = live(conn, "/hub")
     refute html =~ "late.gguf"
@@ -134,6 +141,7 @@ defmodule AgentoWeb.HubLiveTest do
 
     assert eventually(fn -> render(view) =~ summary.requested_model end)
     assert view |> element("#turns tr:first-child", summary.requested_model) |> has_element?()
+    assert view |> element("#turns tr:first-child [data-step=low]", "OK") |> has_element?()
   end
 
   test "tells the operator how to point a client at it", %{conn: conn} do

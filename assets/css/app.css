@@ -1,105 +1,80 @@
-/* See the Tailwind configuration guide for advanced usage
-   https://tailwindcss.com/docs/configuration */
-
-@import "tailwindcss" source(none);
-@source "../css";
-@source "../js";
+/* Tailwind 4 as a layout-only utility layer over imsmith/design-system.
+   No preflight: the design system's base.css owns element defaults.
+   No @layer: gos-ui/styles.css is unlayered, and unlayered CSS outranks any
+   layer, so layered utilities could never override a component padding or a
+   base heading size. Unlayered, this file loads after styles.css and wins on
+   source order at equal specificity, which is the override we want. */
+@import "tailwindcss/theme.css";
+@import "tailwindcss/utilities.css" source(none);
 @source "../../lib/agento_web";
 
-/* A Tailwind plugin that makes "hero-#{ICON}" classes available.
-   The heroicons installation itself is managed by your mix.exs */
-@plugin "../vendor/heroicons";
-
-/* daisyUI Tailwind Plugin. You can update this file by fetching the latest version with:
-   curl -sLO https://github.com/saadeghi/daisyui/releases/latest/download/daisyui.js
-   Make sure to look at the daisyUI changelog: https://daisyui.com/docs/changelog/ */
-@plugin "../vendor/daisyui" {
-  themes: false;
+@theme {
+  --*: initial;
+  --spacing: 0.5rem; /* p-1 = 8px, p-0.5 = 4px: the design-system scale */
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1536px;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-bold: 700;
 }
 
-/* daisyUI theme plugin. You can update this file by fetching the latest version with:
-  curl -sLO https://github.com/saadeghi/daisyui/releases/latest/download/daisyui-theme.js
-  We ship with two themes, a light one inspired on Phoenix colors and a dark one inspired
-  on Elixir colors. Build your own at: https://daisyui.com/theme-generator/ */
-@plugin "../vendor/daisyui-theme" {
-  name: "dark";
-  default: false;
-  prefersdark: true;
-  color-scheme: "dark";
-  --color-base-100: oklch(30.33% 0.016 252.42);
-  --color-base-200: oklch(25.26% 0.014 253.1);
-  --color-base-300: oklch(20.15% 0.012 254.09);
-  --color-base-content: oklch(97.807% 0.029 256.847);
-  --color-primary: oklch(58% 0.233 277.117);
-  --color-primary-content: oklch(96% 0.018 272.314);
-  --color-secondary: oklch(58% 0.233 277.117);
-  --color-secondary-content: oklch(96% 0.018 272.314);
-  --color-accent: oklch(60% 0.25 292.717);
-  --color-accent-content: oklch(96% 0.016 293.756);
-  --color-neutral: oklch(37% 0.044 257.287);
-  --color-neutral-content: oklch(98% 0.003 247.858);
-  --color-info: oklch(58% 0.158 241.966);
-  --color-info-content: oklch(97% 0.013 236.62);
-  --color-success: oklch(60% 0.118 184.704);
-  --color-success-content: oklch(98% 0.014 180.72);
-  --color-warning: oklch(66% 0.179 58.318);
-  --color-warning-content: oklch(98% 0.022 95.277);
-  --color-error: oklch(58% 0.253 17.585);
-  --color-error-content: oklch(96% 0.015 12.422);
-  --radius-selector: 0.25rem;
-  --radius-field: 0.25rem;
-  --radius-box: 0.5rem;
-  --size-selector: 0.21875rem;
-  --size-field: 0.21875rem;
-  --border: 1.5px;
-  --depth: 1;
-  --noise: 0;
+@theme inline reference {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+  --color-status-critical: var(--status-critical);
+  --color-status-high: var(--status-high);
+  --color-status-medium: var(--status-medium);
+  --color-status-low: var(--status-low);
+  --color-status-unknown: var(--status-unknown);
+  --font-mono: var(--font-mono);
+  --font-prose: var(--font-prose);
+  --text-micro: var(--text-micro);
+  --text-caption: var(--text-caption);
+  --text-small: var(--text-small);
+  --text-body: var(--text-body);
+  --text-lead: var(--text-lead);
+  --text-h3: var(--text-h3);
+  --text-h2: var(--text-h2);
+  --text-h1: var(--text-h1);
+  --text-display: var(--text-display);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --leading-tight: var(--leading-tight);
+  --leading-snug: var(--leading-snug);
+  --leading-normal: var(--leading-normal);
+  --tracking-label: var(--tracking-label);
 }
 
-@plugin "../vendor/daisyui-theme" {
-  name: "light";
-  default: true;
-  prefersdark: false;
-  color-scheme: "light";
-  --color-base-100: oklch(98% 0 0);
-  --color-base-200: oklch(96% 0.001 286.375);
-  --color-base-300: oklch(92% 0.004 286.32);
-  --color-base-content: oklch(21% 0.006 285.885);
-  --color-primary: oklch(70% 0.213 47.604);
-  --color-primary-content: oklch(98% 0.016 73.684);
-  --color-secondary: oklch(55% 0.027 264.364);
-  --color-secondary-content: oklch(98% 0.002 247.839);
-  --color-accent: oklch(0% 0 0);
-  --color-accent-content: oklch(100% 0 0);
-  --color-neutral: oklch(44% 0.017 285.786);
-  --color-neutral-content: oklch(98% 0 0);
-  --color-info: oklch(62% 0.214 259.815);
-  --color-info-content: oklch(97% 0.014 254.604);
-  --color-success: oklch(70% 0.14 182.503);
-  --color-success-content: oklch(98% 0.014 180.72);
-  --color-warning: oklch(66% 0.179 58.318);
-  --color-warning-content: oklch(98% 0.022 95.277);
-  --color-error: oklch(58% 0.253 17.585);
-  --color-error-content: oklch(96% 0.015 12.422);
-  --radius-selector: 0.25rem;
-  --radius-field: 0.25rem;
-  --radius-box: 0.5rem;
-  --size-selector: 0.21875rem;
-  --size-field: 0.21875rem;
-  --border: 1.5px;
-  --depth: 1;
-  --noise: 0;
-}
-
-/* Add variants based on LiveView classes */
 @custom-variant phx-click-loading (.phx-click-loading&, .phx-click-loading &);
 @custom-variant phx-submit-loading (.phx-submit-loading&, .phx-submit-loading &);
 @custom-variant phx-change-loading (.phx-change-loading&, .phx-change-loading &);
 
-/* Use the data attribute for dark mode  */
-@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+/* details/summary chevron: points right closed, down open (motion: fast) */
+details > summary { list-style: none; }
+details > summary::-webkit-details-marker { display: none; }
+details .ds-chevron { transition: transform 120ms cubic-bezier(0.2, 0, 0, 1); }
+details[open] > summary .ds-chevron { transform: rotate(90deg); }
 
-/* Make LiveView wrapper divs transparent for layout */
+/* chat messages: a bordered surface, user messages on the accent tint */
+.chat-msg { max-width: 72ch; padding: var(--space-1) var(--space-2); border: var(--border-width) solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
+.chat-msg__body { white-space: pre-wrap; }
+.chat-msg .ds-btn__spin { position: static; display: inline-block; }
+.chat-msg--user { margin-left: auto; border-color: var(--accent); background: var(--accent-tint); }
+.chat-msg--system { color: var(--muted); }
+.chat-role { font-size: var(--text-caption); color: var(--muted); text-transform: uppercase; letter-spacing: var(--tracking-label); margin-bottom: var(--space-half); }
+
+/* No preflight: restore the user-agent hidden rule, which gos-ui's display:flex components would otherwise beat. */
+[hidden]:where(:not([hidden="until-found"])) { display: none !important; }
+/* Connection toasts start hidden; JS.show sets inline display:flex, JS.hide sets display:none. (gos-ui owns the toast style attr, so inline initial state is not available.) */
+#connection-toasts .ds-toast { display: none; }
 [data-phx-session], [data-phx-teleported-src] { display: contents }
-
-/* This file is for your main application CSS */

@@ -4,6 +4,30 @@ Running list of friction, footguns, and small fixes surfaced during agento work.
 
 ---
 
+## 2026-10-14 — gos-ui follow-ups from the design-system migration
+
+Surfaced while re-skinning agento to imsmith/design-system through gos-ui. Each is worked around in agento today; the right home is upstream.
+
+### 1. `theme_switch` should default `phx-auto-recover="ignore"` for a non-push `on_change`
+
+The form has an id and a `phx-change`, so LiveView treats it as a form-recovery candidate on every rejoin. With `on_change={JS.dispatch(...)}` there is no push op, the recovery callback never fires, and the join never completes: after any reconnect the page is dead until a hard reload. agento passes `phx-auto-recover="ignore"` in `layouts.ex`; gos-ui should do it by default when `on_change` is not a push.
+
+### 2. `base.css` should carry the `[hidden]` rule
+
+Consumers run without Tailwind preflight, and `.ds-toast { display: flex }` beats the user-agent `[hidden] { display: none }`. agento adds `[hidden]:where(:not([hidden="until-found"])) { display: none !important; }` in `app.css`; design-system `base.css` is where it belongs.
+
+### 3. `table` should emit `row_id` as a DOM id
+
+`row_id` only feeds `phx-value-id`. Tests that select rows by id (`#performer-*`, `#policy-*`) forced agento to hand-write every table with `ds-table__*` classes.
+
+### 4. `select`/`input` derive `id` from `label`
+
+Two controls labelled the same on one page collide (`Mode` collided with the shell's theme-mode select). An explicit `id` attr exists; a page-unique default would be safer.
+
+### 5. ASCII fallback `^` is shared by `m-upload` and `m-external` (design-system `marks.edn`)
+
+---
+
 ## 2026-08-05 — Model-driven tool dispatch reaches `Tools.Bash` with default config (security)
 
 Surfaced while tracing which policy agento constructs for llmagent's `Tool.Dispatcher`. It constructs none — and the path it does use has no equivalent gate.

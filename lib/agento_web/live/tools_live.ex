@@ -90,123 +90,98 @@ defmodule AgentoWeb.ToolsLive do
   def render(assigns) do
     ~H"""
     <.app flash={@flash} active_nav={:tools}>
-      <div class="flex h-full">
-        <%!-- Tool list sidebar --%>
-        <aside class="w-72 border-r border-base-300 bg-base-200 flex flex-col overflow-hidden">
-          <div class="p-3 border-b border-base-300 flex items-center justify-between">
-            <span class="font-semibold text-sm">
-              Registered Tools ({length(@tools)})
-            </span>
-            <button phx-click="refresh_tools" class="btn btn-ghost btn-xs" title="Refresh">
-              <.icon name="hero-arrow-path-mini" class="size-4" />
-            </button>
+      <div class="flex h-full gap-2">
+        <%!-- Tool list --%>
+        <.card
+          title={"Registered tools (#{length(@tools)})"}
+          density={:compact}
+          flush
+          class="w-36 flex flex-col min-h-0"
+        >
+          <:actions>
+            <.button size={:sm} icon="m-refresh" phx-click="refresh_tools" title="Refresh">Refresh</.button>
+          </:actions>
+          <div class="overflow-y-auto">
+            <.empty :if={@tools == []}>No tools registered.</.empty>
+            <div
+              :for={{name, module} <- @tools}
+              phx-click="select_tool"
+              phx-value-name={name}
+              phx-value-module={module}
+              class={[
+                "p-1 cursor-pointer border-b border-border hover:bg-surface-raised",
+                @selected_tool == to_string(name) && "bg-surface-raised"
+              ]}
+              aria-current={@selected_tool == to_string(name) && "true"}
+            >
+              <div class="font-medium text-small">{name}</div>
+              <div class="text-caption text-muted truncate">{module}</div>
+            </div>
           </div>
-          <div class="flex-1 overflow-y-auto">
-            <%= if @tools == [] do %>
-              <p class="p-3 text-sm text-base-content/50">No tools registered.</p>
-            <% else %>
-              <%= for {name, module} <- @tools do %>
-                <div
-                  phx-click="select_tool"
-                  phx-value-name={name}
-                  phx-value-module={module}
-                  class={[
-                    "p-3 cursor-pointer border-b border-base-300 hover:bg-base-300/50",
-                    @selected_tool == to_string(name) && "bg-base-300"
-                  ]}
-                >
-                  <div class="font-medium text-sm font-mono">{name}</div>
-                  <div class="text-xs text-base-content/60 truncate">{module}</div>
-                </div>
-              <% end %>
-            <% end %>
-          </div>
-        </aside>
+        </.card>
 
-        <%!-- Tool detail panel --%>
-        <div class="flex-1 overflow-y-auto p-4">
+        <%!-- Tool detail --%>
+        <div class="flex-1 overflow-y-auto space-y-2">
           <%= if @selected_module do %>
-            <h2 class="text-xl font-bold mb-2 font-mono">{@selected_tool}</h2>
-            <p class="text-sm text-base-content/70 mb-1">{@selected_module}</p>
+            <h2 class="text-h3">{@selected_tool}</h2>
+            <p class="text-small text-muted">{@selected_module}</p>
 
-            <%!-- Description (R6.2) --%>
-            <%= if assigns[:tool_description] do %>
-              <div class="card bg-base-200 p-4 mb-4">
-                <h3 class="font-semibold text-sm mb-1">Description</h3>
-                <p class="text-sm whitespace-pre-wrap">{@tool_description}</p>
-              </div>
-            <% end %>
+            <.card :if={assigns[:tool_description]} title="Description" density={:compact}>
+              <p class="text-small whitespace-pre-wrap">{@tool_description}</p>
+            </.card>
 
-            <%!-- Comn introspection (R6.2) --%>
-            <%= if @tool_introspection do %>
-              <div class="card bg-base-200 p-4 mb-4">
-                <h3 class="font-semibold text-sm mb-2">Comn Introspection</h3>
-                <div class="text-sm mb-2">
-                  <span class="font-semibold">look/0:</span> {@tool_introspection.look}
-                </div>
-                <div class="text-sm mb-2">
-                  <span class="font-semibold">recon/0:</span>
-                  <pre class="text-xs font-mono mt-1 whitespace-pre-wrap bg-base-300 p-2 rounded">{inspect(@tool_introspection.recon, pretty: true)}</pre>
-                </div>
-                <div class="text-sm">
-                  <span class="font-semibold">choices/0:</span>
-                  <pre class="text-xs font-mono mt-1 whitespace-pre-wrap bg-base-300 p-2 rounded">{inspect(@tool_introspection.choices, pretty: true)}</pre>
-                </div>
-              </div>
-            <% end %>
+            <.card :if={@tool_introspection} title="Comn introspection" density={:compact}>
+              <.key_value>
+                <:item key="look/0">{@tool_introspection.look}</:item>
+                <:item key="recon/0"><.pre value={@tool_introspection.recon} /></:item>
+                <:item key="choices/0"><.pre value={@tool_introspection.choices} /></:item>
+              </.key_value>
+            </.card>
 
-            <%!-- Manual invocation (R6.3) --%>
-            <div class="card bg-base-200 p-4">
-              <h3 class="font-semibold text-sm mb-2">Manual Invocation</h3>
+            <.card title="Manual invocation" density={:compact}>
               <form
                 id="invoke-tool-form"
                 phx-submit="invoke_tool"
                 phx-change="update_invoke"
-                class="space-y-2"
+                class="space-y-1"
               >
-                <input
-                  type="text"
-                  name="action"
-                  value={@invoke_action}
-                  placeholder="Action"
-                  class="input input-bordered input-sm w-full"
-                />
-                <textarea
+                <.input name="action" value={@invoke_action} placeholder="Action" />
+                <.textarea
                   name="args"
-                  class="textarea textarea-bordered w-full font-mono text-sm"
-                  rows="4"
-                  placeholder='{"key": "value"}'
-                >{@invoke_args}</textarea>
-                <button type="submit" class="btn btn-warning btn-sm">
-                  <.icon name="hero-play-mini" class="size-4" /> Invoke
-                </button>
+                  value={@invoke_args}
+                  rows={4}
+                  placeholder={~s|{"key": "value"}|}
+                />
+                <.button type="submit" variant={:primary} size={:sm} icon="m-run">Invoke</.button>
               </form>
 
-              <%= if @invoke_result do %>
-                <div class="mt-3 p-3 bg-success/10 border border-success/30 rounded text-sm">
-                  <div class="font-semibold mb-1">Result:</div>
-                  <pre class="font-mono text-xs whitespace-pre-wrap">{inspect(@invoke_result, pretty: true)}</pre>
-                </div>
-              <% end %>
+              <.alert :if={@invoke_result} severity={:low} title="Invoked." class="mt-1">
+                <.pre value={@invoke_result} />
+              </.alert>
 
-              <%= if @invoke_error do %>
-                <div class="mt-3 p-3 bg-error/10 border border-error/30 rounded text-sm">
-                  <div class="font-semibold mb-1">Error:</div>
-                  <pre class="font-mono text-xs whitespace-pre-wrap">{@invoke_error}</pre>
-                </div>
-              <% end %>
-            </div>
+              <.alert
+                :if={@invoke_error}
+                severity={:critical}
+                title={error_title(@invoke_error)}
+                class="mt-1"
+              >
+                <pre class="ds-data text-caption whitespace-pre-wrap">{@invoke_error}</pre>
+              </.alert>
+            </.card>
           <% else %>
-            <div class="flex items-center justify-center h-full text-base-content/40">
-              <div class="text-center">
-                <.icon name="hero-wrench-screwdriver" class="size-12 mx-auto mb-2" />
-                <p>Select a tool from the list to view details.</p>
-              </div>
-            </div>
+            <.state_panel mode={:empty} mark="m-tool" title="No tool selected.">
+              Pick a tool on the left to see its description, introspection and invoke it.
+            </.state_panel>
           <% end %>
         </div>
       </div>
     </.app>
     """
   end
+
+  # what happened · what to do, per the voice chapter
+  defp error_title("Invalid JSON in args field"),
+    do: "Args are not JSON. Fix the text and invoke again."
+
+  defp error_title(_), do: "The tool returned an error."
 end

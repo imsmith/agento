@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="tron">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -7,30 +7,23 @@
     <.live_title default="LLMAgent" suffix=" · Web UI">
       {assigns[:page_title]}
     </.live_title>
+    <link rel="stylesheet" href="/gos-ui/styles.css" />
     <link phx-track-static rel="stylesheet" href={~p"/assets/css/app.css"} />
     <script defer phx-track-static type="text/javascript" src={~p"/assets/js/app.js"}>
     </script>
     <script>
+      // Theme before first paint. Keys: gos:theme (tron|matrix|compaq), gos:mode (dark|light).
       (() => {
-        const setTheme = (theme) => {
-          if (theme === "system") {
-            localStorage.removeItem("phx:theme");
-            document.documentElement.removeAttribute("data-theme");
-          } else {
-            localStorage.setItem("phx:theme", theme);
-            document.documentElement.setAttribute("data-theme", theme);
-          }
-        };
-        if (!document.documentElement.hasAttribute("data-theme")) {
-          setTheme(localStorage.getItem("phx:theme") || "system");
-        }
-        window.addEventListener("storage", (e) => e.key === "phx:theme" && setTheme(e.newValue || "system"));
-
-        window.addEventListener("phx:set-theme", (e) => setTheme(e.target.dataset.phxTheme));
+        const html = document.documentElement;
+        const theme = localStorage.getItem("gos:theme");
+        const mode = localStorage.getItem("gos:mode");
+        if (theme) html.setAttribute("data-theme", theme);
+        if (mode === "light") html.setAttribute("data-mode", "light");
       })();
     </script>
   </head>
-  <body class="h-screen flex flex-col bg-base-100">
+  <body class="h-screen flex flex-col">
+    <.sprite />
     {@inner_content}
   </body>
 </html>

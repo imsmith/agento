@@ -9,7 +9,7 @@ defmodule AgentoWeb.ToolsLiveTest do
       {:ok, _view, html} = live(conn, "/tools")
 
       # Should show tool count and list
-      assert html =~ "Registered Tools"
+      assert html =~ "Registered tools"
 
       # Verify tools from LLMAgent.Tools.all/0 appear
       tools = LLMAgent.Tools.all()
@@ -24,7 +24,7 @@ defmodule AgentoWeb.ToolsLiveTest do
       {:ok, _view, html} = live(conn, "/tools")
 
       tool_count = length(LLMAgent.Tools.all())
-      assert html =~ "Registered Tools (#{tool_count})"
+      assert html =~ "Registered tools (#{tool_count})"
     end
 
     test "selecting a tool shows description (R6.2)", %{conn: conn} do
@@ -44,13 +44,25 @@ defmodule AgentoWeb.ToolsLiveTest do
       assert html =~ description or html =~ to_string(name)
     end
 
+    test "invalid args JSON is a critical alert with what to do", %{conn: conn} do
+      {:ok, view, _} = live(conn, "/tools")
+      [{name, _module} | _] = LLMAgent.Tools.all()
+
+      view |> element("[phx-click=select_tool][phx-value-name=#{name}]") |> render_click()
+      form = form(view, "form[phx-submit=invoke_tool]", %{"action" => "x", "args" => "{nope"})
+      # invoke_tool reads the assigns that update_invoke keeps, not the submit params
+      render_change(form)
+      render_submit(form)
+      assert has_element?(view, "[data-severity=critical]", "Args are not JSON")
+    end
+
     test "refresh tools updates the list", %{conn: conn} do
       {:ok, view, _html} = live(conn, "/tools")
 
       view |> element("button[phx-click=refresh_tools]") |> render_click()
 
       html = render(view)
-      assert html =~ "Registered Tools"
+      assert html =~ "Registered tools"
     end
   end
 
@@ -93,6 +105,41 @@ defmodule AgentoWeb.ToolsLiveTest do
 
       {:ok, _view, html} = live(conn, "/tools")
       assert html =~ "test_dynamic"
+    end
+
+    test "a successful invocation is a low-severity alert with the result", %{conn: conn} do
+      {:module, mod, _, _} =
+        Module.create(
+          :"Elixir.LLMAgent.Tools.TestDynamic",
+          quote do
+            @behaviour LLMAgent.Tool
+            def describe, do: "A dynamic test tool for VA1"
+            def perform(_, _), do: {:ok, %{output: "dynamic", metadata: %{}}}
+          end,
+          Macro.Env.location(__ENV__)
+        )
+
+      LLMAgent.Tools.register(:test_dynamic, mod)
+
+      on_exit(fn ->
+        try do
+          LLMAgent.Tools.unregister(:test_dynamic)
+        catch
+          _, _ -> :ok
+        end
+
+        :code.purge(mod)
+        :code.delete(mod)
+      end)
+
+      {:ok, view, _} = live(conn, "/tools")
+      view |> element("[phx-click=select_tool][phx-value-name=test_dynamic]") |> render_click()
+      form = form(view, "form#invoke-tool-form", %{"action" => "any", "args" => "{}"})
+      render_change(form)
+      render_submit(form)
+
+      assert has_element?(view, "[data-severity=low]", "dynamic")
+      assert has_element?(view, "[data-severity=low] .ds-alert__title", "Invoked.")
     end
   end
 end

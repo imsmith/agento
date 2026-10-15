@@ -168,58 +168,25 @@ defmodule AgentoWeb.SystemLive do
     ~H"""
     <.app flash={@flash} active_nav={:system}>
       <div class="flex flex-col h-full">
-        <%!-- Sub-tabs --%>
-        <div class="tabs tabs-bordered px-4 pt-2 bg-base-100 border-b border-base-300">
-          <button
-            phx-click="set_tab"
-            phx-value-tab="sup_tree"
-            class={["tab", @active_tab == :sup_tree && "tab-active"]}
-          >
-            Supervision Tree
-          </button>
-          <button
-            phx-click="set_tab"
-            phx-value-tab="ets"
-            class={["tab", @active_tab == :ets && "tab-active"]}
-          >
-            ETS Tables
-          </button>
-          <button
-            phx-click="set_tab"
-            phx-value-tab="contexts"
-            class={["tab", @active_tab == :contexts && "tab-active"]}
-          >
-            Contexts
-          </button>
-          <button
-            phx-click="set_tab"
-            phx-value-tab="errors"
-            class={["tab", @active_tab == :errors && "tab-active"]}
-          >
-            Error Catalog
-          </button>
-          <button
-            phx-click="set_tab"
-            phx-value-tab="modules"
-            class={["tab", @active_tab == :modules && "tab-active"]}
-          >
-            Modules
-          </button>
-          <button
-            phx-click="set_tab"
-            phx-value-tab="durable_log"
-            class={["tab", @active_tab == :durable_log && "tab-active"]}
-          >
-            DurableLog
-          </button>
+        <div class="ds-tabs">
+          <div class="ds-tabs__list" role="tablist">
+            <button
+              :for={{id, label} <- tabs()}
+              type="button"
+              role="tab"
+              class="ds-tab"
+              aria-selected={to_string(@active_tab == id)}
+              phx-click="set_tab"
+              phx-value-tab={id}
+            >
+              <span>{label}</span>
+            </button>
+          </div>
         </div>
 
-        <%!-- Tab content --%>
-        <div class="flex-1 overflow-y-auto p-4">
-          <div class="flex items-center justify-between mb-4">
-            <button phx-click="refresh" class="btn btn-ghost btn-sm">
-              <.icon name="hero-arrow-path-mini" class="size-4" /> Refresh
-            </button>
+        <div class="flex-1 overflow-y-auto pt-1 space-y-2">
+          <div class="flex items-center justify-between">
+            <.button size={:sm} icon="m-refresh" phx-click="refresh">Refresh</.button>
           </div>
 
           <%= case @active_tab do %>
@@ -251,35 +218,33 @@ defmodule AgentoWeb.SystemLive do
     """
   end
 
+  defp tabs,
+    do: [
+      sup_tree: "Supervision tree",
+      ets: "ETS tables",
+      contexts: "Contexts",
+      errors: "Error catalog",
+      modules: "Modules",
+      durable_log: "DurableLog"
+    ]
+
   # -- Sub-panels --
 
   defp sup_tree_panel(assigns) do
     ~H"""
     <div>
-      <div class="flex items-center gap-2 mb-3">
-        <h3 class="font-semibold">LLMAgent Supervision Tree (R4)</h3>
-        <button
+      <div class="flex items-center gap-1 mb-1.5">
+        <h3 class="ds-label">LLMAgent supervision tree</h3>
+        <.button
+          size={:sm}
+          variant={if @auto_refresh, do: :primary, else: :ghost}
           phx-click="toggle_auto_refresh"
-          class={[
-            "btn btn-xs",
-            if(@auto_refresh, do: "btn-primary", else: "btn-ghost")
-          ]}
-        >
-          Auto-refresh
-        </button>
+        >Auto-refresh</.button>
       </div>
-
-      <%= if @tree == [] do %>
-        <p class="text-sm text-base-content/50">
-          No supervision tree loaded. Click Refresh above.
-        </p>
-      <% else %>
-        <div class="space-y-1">
-          <%= for node <- @tree do %>
-            <.tree_node node={node} depth={0} />
-          <% end %>
-        </div>
-      <% end %>
+      <.empty :if={@tree == []}>No supervision tree loaded. Click Refresh above.</.empty>
+      <div :if={@tree != []} class="space-y-0.5">
+        <.tree_node :for={node <- @tree} node={node} depth={0} />
+      </div>
     </div>
     """
   end
@@ -287,33 +252,22 @@ defmodule AgentoWeb.SystemLive do
   defp tree_node(assigns) do
     ~H"""
     <div style={"margin-left: #{@depth * 1.5}rem"}>
-      <div class="flex items-center gap-2 p-2 rounded hover:bg-base-200 text-sm">
+      <div class="flex items-center gap-1 p-1 rounded-md hover:bg-surface-raised text-small">
         <%= if @node[:children] && @node[:children] != [] do %>
-          <.icon name="hero-chevron-down-mini" class="size-3" />
+          <.mark name="m-chevron" size={12} class="rotate-90" />
         <% else %>
-          <span class="w-3"></span>
+          <span class="w-1.5"></span>
         <% end %>
-        <span class="font-mono font-medium">{@node[:name] || @node[:module]}</span>
-        <span class="text-xs text-base-content/60">{@node[:module]}</span>
-        <span class={[
-          "badge badge-xs",
-          if(@node[:alive], do: "badge-success", else: "badge-error")
-        ]}>
-          {if @node[:alive], do: "alive", else: "dead"}
-        </span>
-        <%= if @node[:pid] do %>
-          <span class="text-xs font-mono text-base-content/40">{inspect(@node[:pid])}</span>
-        <% end %>
-        <%= if @node[:message_queue_len] do %>
-          <span class="text-xs text-base-content/40">
-            mq: {@node[:message_queue_len]}
-          </span>
-        <% end %>
+        <span class="ds-data font-medium">{@node[:name] || @node[:module]}</span>
+        <span class="text-caption text-muted">{@node[:module]}</span>
+        <.status_badge step={if @node[:alive], do: :low, else: :critical} size={10} />
+        <span :if={@node[:pid]} class="text-caption ds-data text-muted">{inspect(@node[:pid])}</span>
+        <span :if={@node[:message_queue_len]} class="text-caption text-muted">mq: {@node[
+          :message_queue_len
+        ]}</span>
       </div>
       <%= if @node[:children] do %>
-        <%= for child <- @node[:children] do %>
-          <.tree_node node={child} depth={@depth + 1} />
-        <% end %>
+        <.tree_node :for={child <- @node[:children]} node={child} depth={@depth + 1} />
       <% end %>
     </div>
     """
@@ -322,46 +276,31 @@ defmodule AgentoWeb.SystemLive do
   defp ets_panel(assigns) do
     ~H"""
     <div>
-      <h3 class="font-semibold mb-3">ETS Tables (R5.1)</h3>
-      <div class="flex gap-4">
-        <div class="w-64 space-y-1">
-          <%= if @tables == [] do %>
-            <p class="text-sm text-base-content/50">No llmagent memory tables found.</p>
-          <% else %>
-            <%= for table <- @tables do %>
-              <div
-                phx-click="select_ets_table"
-                phx-value-name={table.name}
-                class={[
-                  "p-2 rounded cursor-pointer hover:bg-base-200 text-sm",
-                  @selected == to_string(table.name) && "bg-base-200"
-                ]}
-              >
-                <div class="font-mono font-medium">{table.name}</div>
-                <div class="text-xs text-base-content/60">
-                  Size: {table.size} | Mem: {table.memory} words
-                </div>
-              </div>
-            <% end %>
-          <% end %>
-        </div>
-
-        <%= if @selected do %>
-          <div class="flex-1">
-            <h4 class="font-semibold mb-2 font-mono">{@selected}</h4>
-            <%= if @entries == [] do %>
-              <p class="text-sm text-base-content/50">Table is empty.</p>
-            <% else %>
-              <div class="space-y-2">
-                <%= for entry <- @entries do %>
-                  <div class="bg-base-200 p-3 rounded">
-                    <pre class="text-xs font-mono whitespace-pre-wrap">{inspect(entry, pretty: true)}</pre>
-                  </div>
-                <% end %>
-              </div>
-            <% end %>
+      <h3 class="ds-label mb-1.5">ETS tables</h3>
+      <div class="flex gap-2">
+        <div class="w-32 space-y-0.5">
+          <.empty :if={@tables == []}>No llmagent memory tables found.</.empty>
+          <div
+            :for={table <- @tables}
+            phx-click="select_ets_table"
+            phx-value-name={table.name}
+            class={[
+              "p-1 rounded-md cursor-pointer hover:bg-surface-raised text-small",
+              @selected == to_string(table.name) && "bg-surface-raised"
+            ]}
+            aria-current={@selected == to_string(table.name) && "true"}
+          >
+            <div class="ds-data font-medium">{table.name}</div>
+            <div class="text-caption text-muted">Size: {table.size} | Mem: {table.memory} words</div>
           </div>
-        <% end %>
+        </div>
+        <div :if={@selected} class="flex-1">
+          <h4 class="ds-data mb-1">{@selected}</h4>
+          <.empty :if={@entries == []}>Table is empty.</.empty>
+          <div :if={@entries != []} class="space-y-1">
+            <.pre :for={entry <- @entries} value={entry} />
+          </div>
+        </div>
       </div>
     </div>
     """
@@ -370,35 +309,21 @@ defmodule AgentoWeb.SystemLive do
   defp contexts_panel(assigns) do
     ~H"""
     <div>
-      <h3 class="font-semibold mb-1">Agent Contexts (R5.2)</h3>
-      <p class="text-xs text-base-content/50 mb-3">
+      <h3 class="ds-label mb-0.5">Agent contexts</h3>
+      <p class="text-caption text-muted mb-1.5">
         Point-in-time snapshot. Context data is ephemeral and only set during prompt handling.
       </p>
-      <%= if @contexts == [] do %>
-        <p class="text-sm text-base-content/50">No agent contexts found.</p>
-      <% else %>
-        <div class="space-y-3">
-          <%= for ctx <- @contexts do %>
-            <div class="card bg-base-200 p-4">
-              <h4 class="font-semibold font-mono mb-2">{ctx.agent_name}</h4>
-              <%= if ctx.context do %>
-                <table class="table table-xs">
-                  <tbody>
-                    <%= for {key, val} <- Map.from_struct(ctx.context) do %>
-                      <tr>
-                        <td class="font-semibold w-40">{key}</td>
-                        <td class="font-mono text-xs">{inspect(val)}</td>
-                      </tr>
-                    <% end %>
-                  </tbody>
-                </table>
-              <% else %>
-                <p class="text-sm text-base-content/50">No context set.</p>
-              <% end %>
-            </div>
-          <% end %>
-        </div>
-      <% end %>
+      <.empty :if={@contexts == []}>No agent contexts found.</.empty>
+      <div :if={@contexts != []} class="space-y-1.5">
+        <.card :for={ctx <- @contexts} title={to_string(ctx.agent_name)} density={:compact}>
+          <.key_value :if={ctx.context} density={:dense}>
+            <:item :for={{key, val} <- Map.from_struct(ctx.context)} key={to_string(key)}>
+              {inspect(val)}
+            </:item>
+          </.key_value>
+          <.empty :if={!ctx.context}>No context set.</.empty>
+        </.card>
+      </div>
     </div>
     """
   end
@@ -406,47 +331,33 @@ defmodule AgentoWeb.SystemLive do
   defp errors_panel(assigns) do
     ~H"""
     <div>
-      <h3 class="font-semibold mb-3">Error Catalog (R5.3)</h3>
-
-      <div class="mb-4">
-        <h4 class="text-sm font-semibold mb-1">Categories</h4>
-        <div class="flex gap-2 flex-wrap">
-          <%= for cat <- @categories do %>
-            <span class="badge badge-outline">{cat}</span>
-          <% end %>
+      <h3 class="ds-label mb-1.5">Error catalog</h3>
+      <div class="mb-2">
+        <h4 class="ds-label mb-0.5">Categories</h4>
+        <div class="flex gap-1 flex-wrap">
+          <.tag :for={cat <- @categories}>{cat}</.tag>
         </div>
       </div>
-
       <div>
-        <h4 class="text-sm font-semibold mb-1">Error Events by Category</h4>
-        <%= if @events == [] do %>
-          <p class="text-sm text-base-content/50">No error events recorded.</p>
-        <% else %>
-          <div class="space-y-4">
-            <%= for {category, evts} <- group_errors_by_category(@events) do %>
-              <div data-category={category}>
-                <div class="flex items-center gap-2 mb-1">
-                  <span class="badge badge-neutral">{category}</span>
-                  <span class="text-xs text-base-content/60">{length(evts)}</span>
-                </div>
-                <div class="space-y-2">
-                  <%= for evt <- evts do %>
-                    <div class="alert alert-error text-sm">
-                      <div>
-                        <div class="font-medium">
-                          {evt.data[:reason] || evt.data["reason"] || "unknown"}
-                        </div>
-                        <div class="text-xs">
-                          Source: {evt.data[:source] || evt.data["source"] || "unknown"}
-                        </div>
-                      </div>
-                    </div>
-                  <% end %>
-                </div>
-              </div>
-            <% end %>
+        <h4 class="ds-label mb-0.5">Error events by category</h4>
+        <.empty :if={@events == []}>No error events recorded.</.empty>
+        <div :if={@events != []} class="space-y-2">
+          <div :for={{category, evts} <- group_errors_by_category(@events)} data-category={category}>
+            <div class="flex items-center gap-1 mb-0.5">
+              <.tag accent>{category}</.tag>
+              <span class="text-caption text-muted">{length(evts)}</span>
+            </div>
+            <div class="space-y-1">
+              <.alert
+                :for={evt <- evts}
+                severity={:critical}
+                title={to_string(evt.data[:reason] || evt.data["reason"] || "unknown")}
+              >
+                Source: {evt.data[:source] || evt.data["source"] || "unknown"}
+              </.alert>
+            </div>
           </div>
-        <% end %>
+        </div>
       </div>
     </div>
     """
@@ -455,43 +366,32 @@ defmodule AgentoWeb.SystemLive do
   defp modules_panel(assigns) do
     ~H"""
     <div>
-      <h3 class="font-semibold mb-3">Comn Modules (R5.4)</h3>
-      <div class="flex gap-4">
-        <div class="w-72 space-y-1">
-          <%= if @modules == [] do %>
-            <p class="text-sm text-base-content/50">No Comn behaviour modules found.</p>
-          <% else %>
-            <%= for mod <- @modules do %>
-              <div
-                phx-click="select_module"
-                phx-value-module={mod}
-                class={[
-                  "p-2 rounded cursor-pointer hover:bg-base-200 text-sm font-mono",
-                  @selected == to_string(mod) && "bg-base-200"
-                ]}
-              >
-                {mod}
-              </div>
-            <% end %>
-          <% end %>
-        </div>
-
-        <%= if @introspection do %>
-          <div class="flex-1 space-y-3">
-            <div class="card bg-base-200 p-4">
-              <h4 class="font-semibold text-sm mb-1">look/0</h4>
-              <p class="text-sm">{@introspection.look}</p>
-            </div>
-            <div class="card bg-base-200 p-4">
-              <h4 class="font-semibold text-sm mb-1">recon/0</h4>
-              <pre class="text-xs font-mono whitespace-pre-wrap">{inspect(@introspection.recon, pretty: true)}</pre>
-            </div>
-            <div class="card bg-base-200 p-4">
-              <h4 class="font-semibold text-sm mb-1">choices/0</h4>
-              <pre class="text-xs font-mono whitespace-pre-wrap">{inspect(@introspection.choices, pretty: true)}</pre>
-            </div>
+      <h3 class="ds-label mb-1.5">Comn modules</h3>
+      <div class="flex gap-2">
+        <div class="w-36 space-y-0.5">
+          <.empty :if={@modules == []}>No Comn behaviour modules found.</.empty>
+          <div
+            :for={mod <- @modules}
+            phx-click="select_module"
+            phx-value-module={mod}
+            class={[
+              "p-1 rounded-md cursor-pointer hover:bg-surface-raised text-small ds-data",
+              @selected == to_string(mod) && "bg-surface-raised"
+            ]}
+            aria-current={@selected == to_string(mod) && "true"}
+          >
+            {mod}
           </div>
-        <% end %>
+        </div>
+        <div :if={@introspection} class="flex-1">
+          <.card density={:compact}>
+            <.key_value>
+              <:item key="look/0">{@introspection.look}</:item>
+              <:item key="recon/0"><.pre value={@introspection.recon} /></:item>
+              <:item key="choices/0"><.pre value={@introspection.choices} /></:item>
+            </.key_value>
+          </.card>
+        </div>
       </div>
     </div>
     """
@@ -500,99 +400,62 @@ defmodule AgentoWeb.SystemLive do
   defp durable_log_panel(assigns) do
     ~H"""
     <div>
-      <h3 class="font-semibold mb-3">DurableLog Inspector (R7)</h3>
+      <h3 class="ds-label mb-1.5">DurableLog inspector</h3>
 
-      <%!-- Status (R7.1) --%>
-      <%= if @status do %>
-        <div class="card bg-base-200 p-4 mb-4">
-          <h4 class="font-semibold text-sm mb-2">DurableLog Status</h4>
-          <table class="table table-xs">
-            <tbody>
-              <tr>
-                <td class="font-semibold">DETS File</td>
-                <td class="font-mono">{@status[:file_path]}</td>
-              </tr>
-              <tr>
-                <td class="font-semibold">File Size</td>
-                <td>{@status[:file_size]}</td>
-              </tr>
-              <tr>
-                <td class="font-semibold">Record Count</td>
-                <td>{@status[:record_count]}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      <% end %>
+      <div :if={@status} class="grid grid-cols-3 gap-1 mb-2">
+        <.stat_tile label="Record count" value={@status[:record_count]} />
+        <.stat_tile label="File size" value={@status[:file_size]} unit="bytes" />
+        <.stat_tile label="DETS file" value={@status[:file_path]} class="col-span-1 overflow-hidden" />
+      </div>
 
-      <%!-- Browse by agent (R7.2) --%>
-      <div class="flex gap-4">
-        <div class="w-64">
-          <h4 class="font-semibold text-sm mb-2">Agents</h4>
-          <%= if @agents == [] do %>
-            <p class="text-sm text-base-content/50">No agents found.</p>
-          <% else %>
-            <div class="space-y-1">
-              <%= for agent <- @agents do %>
-                <div
-                  phx-click="select_durable_agent"
-                  phx-value-agent={agent}
-                  class={[
-                    "p-2 rounded cursor-pointer hover:bg-base-200 text-sm font-mono",
-                    @selected == to_string(agent) && "bg-base-200"
-                  ]}
-                >
-                  {agent}
-                </div>
-              <% end %>
-            </div>
-          <% end %>
-        </div>
-
-        <%= if @info do %>
-          <div class="flex-1">
-            <div class="card bg-base-200 p-4">
-              <h4 class="font-semibold font-mono mb-2">{@info.agent}</h4>
-              <table class="table table-xs">
-                <tbody>
-                  <tr>
-                    <td class="font-semibold">Event Count</td>
-                    <td>{@info.event_count}</td>
-                  </tr>
-                  <tr>
-                    <td class="font-semibold">Message Count</td>
-                    <td>{@info.message_count}</td>
-                  </tr>
-                  <tr>
-                    <td class="font-semibold">First Timestamp</td>
-                    <td class="font-mono">{@info.first_timestamp || "N/A"}</td>
-                  </tr>
-                  <tr>
-                    <td class="font-semibold">Last Timestamp</td>
-                    <td class="font-mono">{@info.last_timestamp || "N/A"}</td>
-                  </tr>
-                </tbody>
-              </table>
-
-              <div class="mt-3 flex gap-2">
-                <a
-                  href={~p"/export/#{@info.agent}?kind=events"}
-                  class="btn btn-xs btn-primary"
-                  download
-                >
-                  <.icon name="hero-arrow-down-tray-mini" class="size-3" /> Events JSON
-                </a>
-                <a
-                  href={~p"/export/#{@info.agent}?kind=messages"}
-                  class="btn btn-xs btn-primary"
-                  download
-                >
-                  <.icon name="hero-arrow-down-tray-mini" class="size-3" /> Messages JSON
-                </a>
-              </div>
+      <div class="flex gap-2">
+        <div class="w-32">
+          <h4 class="ds-label mb-1">Agents</h4>
+          <.empty :if={@agents == []}>No agents found.</.empty>
+          <div :if={@agents != []} class="space-y-0.5">
+            <div
+              :for={agent <- @agents}
+              phx-click="select_durable_agent"
+              phx-value-agent={agent}
+              class={[
+                "p-1 rounded-md cursor-pointer hover:bg-surface-raised text-small ds-data",
+                @selected == to_string(agent) && "bg-surface-raised"
+              ]}
+              aria-current={@selected == to_string(agent) && "true"}
+            >
+              {agent}
             </div>
           </div>
-        <% end %>
+        </div>
+
+        <div :if={@info} class="flex-1">
+          <.card title={to_string(@info.agent)} density={:compact}>
+            <div class="grid grid-cols-2 gap-1 mb-1">
+              <.stat_tile label="Event count" value={@info.event_count} />
+              <.stat_tile label="Message count" value={@info.message_count} />
+            </div>
+            <.key_value density={:dense}>
+              <:item key="First timestamp">{@info.first_timestamp || "N/A"}</:item>
+              <:item key="Last timestamp">{@info.last_timestamp || "N/A"}</:item>
+            </.key_value>
+            <:footer>
+              <a
+                href={~p"/export/#{@info.agent}?kind=events"}
+                class="ds-btn ds-btn--primary ds-btn--sm"
+                download
+              >
+                <.mark name="m-download" size={14} /> Events JSON
+              </a>
+              <a
+                href={~p"/export/#{@info.agent}?kind=messages"}
+                class="ds-btn ds-btn--primary ds-btn--sm"
+                download
+              >
+                <.mark name="m-download" size={14} /> Messages JSON
+              </a>
+            </:footer>
+          </.card>
+        </div>
       </div>
     </div>
     """

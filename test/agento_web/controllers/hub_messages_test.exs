@@ -9,6 +9,7 @@ defmodule AgentoWeb.HubMessagesTest do
 
   import AgentoWeb.HubCase
 
+  alias AgentoWeb.FakeHTTP
   alias AgentoWeb.Hub.Turn
   alias LLMAgent.Codec.Anthropic
   alias LLMAgent.Tool.Policy
@@ -16,21 +17,21 @@ defmodule AgentoWeb.HubMessagesTest do
   setup %{conn: conn} do
     reset_registry()
     config = install_config(default_host: "skynet-test.local")
-    bypass = Bypass.open()
-    ad = register(api_host: "http://localhost:#{bypass.port}", model: "performer.gguf")
+    server = FakeHTTP.open()
+    ad = register(api_host: "http://localhost:#{server.port}", model: "performer.gguf")
 
     conn =
       conn
       |> put_req_header("authorization", "Bearer #{token()}")
       |> put_req_header("content-type", "application/json")
 
-    {:ok, conn: conn, bypass: bypass, ad: ad, config: config, client: hd(config.clients)}
+    {:ok, conn: conn, server: server, ad: ad, config: config, client: hd(config.clients)}
   end
 
-  defp serve(bypass, fixture_name, opts \\ []) do
+  defp serve(server, fixture_name, opts \\ []) do
     test = self()
 
-    Bypass.expect_once(bypass, "POST", "/chat/completions", fn conn ->
+    FakeHTTP.expect_once(server, "POST", "/chat/completions", fn conn ->
       {:ok, request, conn} = Plug.Conn.read_body(conn)
       send(test, {:performer_request, Jason.decode!(request)})
       if delay = opts[:delay], do: Process.sleep(delay)
@@ -44,8 +45,8 @@ defmodule AgentoWeb.HubMessagesTest do
     end)
   end
 
-  defp never_contacted(bypass) do
-    Bypass.stub(bypass, "POST", "/chat/completions", fn _conn ->
+  defp never_contacted(server) do
+    FakeHTTP.stub(server, "POST", "/chat/completions", fn _conn ->
       flunk("the performer was contacted")
     end)
   end
@@ -59,7 +60,7 @@ defmodule AgentoWeb.HubMessagesTest do
 
   describe "a streaming turn" do
     test "returns the performer's reply as an Anthropic event stream", ctx do
-      serve(ctx.bypass, "openai_tool_stream.sse")
+      serve(ctx.server, "openai_tool_stream.sse")
       conn = post(ctx.conn, "/v1/messages?beta=true", fixture("claude_code_request.json"))
 
       assert conn.status == 200
@@ -85,7 +86,7 @@ defmodule AgentoWeb.HubMessagesTest do
     end
 
     test "sends the performer its own model and a leading system message", ctx do
-      serve(ctx.bypass, "openai_text_stream.sse")
+      serve(ctx.server, "openai_text_stream.sse")
       post(ctx.conn, "/v1/messages", fixture("claude_code_request.json"))
 
       assert_received {:performer_request, request}
@@ -98,7 +99,7 @@ defmodule AgentoWeb.HubMessagesTest do
     end
 
     test "carries a follow-up turn with a tool result", ctx do
-      serve(ctx.bypass, "openai_text_stream.sse")
+      serve(ctx.server, "openai_text_stream.sse")
       conn = post(ctx.conn, "/v1/messages", fixture("claude_code_followup_request.json"))
 
       text =
@@ -117,7 +118,7 @@ defmodule AgentoWeb.HubMessagesTest do
     # governs how long a silent performer is waited for.
     test "waits for a silent performer for as long as the configured timeout allows", ctx do
       install_config(default_host: "skynet-test.local", performer_timeout_ms: 5_000)
-      serve(ctx.bypass, "openai_text_stream.sse", delay: 1_500)
+      serve(ctx.server, "openai_text_stream.sse", delay: 1_500)
       conn = post(ctx.conn, "/v1/messages", fixture("claude_code_request.json"))
 
       assert conn.status == 200
@@ -126,7 +127,7 @@ defmodule AgentoWeb.HubMessagesTest do
 
     test "ends with an error frame when the performer's reply is cut short", ctx do
       whole = fixture("openai_tool_stream.sse")
-      serve(ctx.bypass, nil, body: binary_part(whole, 0, div(byte_size(whole), 2)))
+      serve(ctx.server, nil, body: binary_part(whole, 0, div(byte_size(whole), 2)))
       conn = post(ctx.conn, "/v1/messages", fixture("claude_code_request.json"))
 
       assert conn.status == 200
@@ -138,7 +139,7 @@ defmodule AgentoWeb.HubMessagesTest do
 
   describe "a non-streaming turn" do
     test "returns one JSON message", ctx do
-      serve(ctx.bypass, "openai_text_stream.sse")
+      serve(ctx.server, "openai_text_stream.sse")
 
       body =
         "claude_code_followup_request.json"
@@ -160,7 +161,7 @@ defmodule AgentoWeb.HubMessagesTest do
 
   describe "a request the hub refuses" do
     test "an unknown content block is a 400 naming it, and the performer is not contacted", ctx do
-      never_contacted(ctx.bypass)
+      never_contacted(ctx.server)
 
       body =
         "claude_code_request.json"
@@ -178,7 +179,7 @@ defmodule AgentoWeb.HubMessagesTest do
     end
 
     test "a model that is not a string is a 400, and the turn log is unharmed", ctx do
-      never_contacted(ctx.bypass)
+      never_contacted(ctx.server)
       log = Process.whereis(Agento.Hub.TurnLog)
 
       body =
@@ -199,19 +200,19 @@ defmodule AgentoWeb.HubMessagesTest do
     end
 
     test "a body that is not a Messages request is a 400", ctx do
-      never_contacted(ctx.bypass)
+      never_contacted(ctx.server)
 
       assert {"invalid_request_error", _} =
                ctx.conn |> post("/v1/messages", ~s({"model": "m"})) |> error_body(400)
     end
 
     test "malformed JSON is a 400", ctx do
-      never_contacted(ctx.bypass)
+      never_contacted(ctx.server)
       assert_error_sent 400, fn -> post(ctx.conn, "/v1/messages", ~s({"model": )) end
     end
 
     test "no token is a 401 before anything else", ctx do
-      never_contacted(ctx.bypass)
+      never_contacted(ctx.server)
 
       conn =
         ctx.conn
@@ -223,7 +224,7 @@ defmodule AgentoWeb.HubMessagesTest do
 
     test "a rule that refuses the turn is a 403 saying why, and the performer is not contacted",
          ctx do
-      never_contacted(ctx.bypass)
+      never_contacted(ctx.server)
 
       :ok =
         Agento.Rules.load("refusing-test.rule", """
@@ -242,7 +243,7 @@ defmodule AgentoWeb.HubMessagesTest do
 
     test "with no performer the answer is a 404 naming the model", ctx do
       reset_registry()
-      never_contacted(ctx.bypass)
+      never_contacted(ctx.server)
 
       assert {"not_found_error", message} =
                ctx.conn
@@ -255,7 +256,7 @@ defmodule AgentoWeb.HubMessagesTest do
 
   describe "a performer that fails before replying" do
     test "a chat-template failure is a 502 carrying the performer's message, as JSON", ctx do
-      serve(ctx.bypass, "openai_error_500_template.json",
+      serve(ctx.server, "openai_error_500_template.json",
         status: 500,
         content_type: "application/json"
       )
@@ -273,7 +274,7 @@ defmodule AgentoWeb.HubMessagesTest do
     end
 
     test "a performer that is down is a 502", ctx do
-      Bypass.down(ctx.bypass)
+      FakeHTTP.down(ctx.server)
 
       assert {"api_error", _} =
                ctx.conn
@@ -282,7 +283,7 @@ defmodule AgentoWeb.HubMessagesTest do
     end
 
     test "an empty reply is a 502, not an empty stream", ctx do
-      serve(ctx.bypass, nil, body: "")
+      serve(ctx.server, nil, body: "")
 
       assert {"api_error", _} =
                ctx.conn
@@ -324,7 +325,7 @@ defmodule AgentoWeb.HubMessagesTest do
     end
 
     test "a successful turn is recorded with both bodies, the request byte for byte", ctx do
-      serve(ctx.bypass, "openai_text_stream.sse")
+      serve(ctx.server, "openai_text_stream.sse")
       {model, body} = unique_request()
       assert post(ctx.conn, "/v1/messages?beta=true", body).status == 200
 
@@ -360,7 +361,7 @@ defmodule AgentoWeb.HubMessagesTest do
     end
 
     test "a turn the performer failed is recorded as an error", ctx do
-      Bypass.down(ctx.bypass)
+      FakeHTTP.down(ctx.server)
       {model, body} = unique_request()
       assert post(ctx.conn, "/v1/messages", body).status == 502
 
@@ -382,7 +383,7 @@ defmodule AgentoWeb.HubMessagesTest do
       :ok = Supervisor.terminate_child(Agento.Supervisor, TurnLog)
       on_exit(fn -> Supervisor.restart_child(Agento.Supervisor, TurnLog) end)
 
-      serve(ctx.bypass, "openai_text_stream.sse")
+      serve(ctx.server, "openai_text_stream.sse")
       conn = post(ctx.conn, "/v1/messages", fixture("claude_code_request.json"))
 
       assert conn.status == 200
@@ -397,7 +398,7 @@ defmodule AgentoWeb.HubMessagesTest do
     end
 
     test "a successful turn emits one event with the turn's facts and neither body", ctx do
-      serve(ctx.bypass, "openai_text_stream.sse")
+      serve(ctx.server, "openai_text_stream.sse")
       body = fixture("claude_code_request.json")
       post(ctx.conn, "/v1/messages", body)
 
@@ -431,7 +432,7 @@ defmodule AgentoWeb.HubMessagesTest do
     end
 
     test "a failed turn emits one event carrying the error", ctx do
-      Bypass.down(ctx.bypass)
+      FakeHTTP.down(ctx.server)
       post(ctx.conn, "/v1/messages", fixture("claude_code_request.json"))
 
       assert_receive {:event, "hub.request", %{data: %{outcome: "error", error: error}}}, 1_000
@@ -463,7 +464,7 @@ defmodule AgentoWeb.HubMessagesTest do
     end
 
     test "summarises a successful turn", ctx do
-      serve(ctx.bypass, "openai_tool_stream.sse")
+      serve(ctx.server, "openai_tool_stream.sse")
       body = fixture("claude_code_request.json")
 
       assert {conn, summary} = Turn.run(test_conn(body), turn(), ctx.ad, ctx.client, ctx.config)
@@ -492,7 +493,7 @@ defmodule AgentoWeb.HubMessagesTest do
     end
 
     test "summarises a failed turn", ctx do
-      Bypass.down(ctx.bypass)
+      FakeHTTP.down(ctx.server)
 
       assert {conn, summary} = Turn.run(test_conn("{}"), turn(), ctx.ad, ctx.client, ctx.config)
       assert conn.status == 502
@@ -518,7 +519,7 @@ defmodule AgentoWeb.HubMessagesTest do
     end
 
     test "a client that has hung up is recorded as aborted and the performer is halted", ctx do
-      serve(ctx.bypass, "openai_text_stream.sse")
+      serve(ctx.server, "openai_text_stream.sse")
       conn = "{}" |> test_conn() |> AgentoWeb.ClosingConn.wrap()
 
       assert {_conn, summary} = Turn.run(conn, turn(), ctx.ad, ctx.client, ctx.config)
@@ -533,7 +534,7 @@ defmodule AgentoWeb.HubMessagesTest do
     end
 
     test "x-hub-billing says what the performer's provenance says", ctx do
-      serve(ctx.bypass, "openai_text_stream.sse")
+      serve(ctx.server, "openai_text_stream.sse")
       {conn, _} = Turn.run(test_conn("{}"), turn(), ctx.ad, ctx.client, ctx.config)
       assert get_resp_header(conn, "x-hub-billing") == ["local"]
 
@@ -542,7 +543,7 @@ defmodule AgentoWeb.HubMessagesTest do
       paid =
         llama_ad(
           id: "cloud.1",
-          api_host: "http://localhost:#{ctx.bypass.port}",
+          api_host: "http://localhost:#{ctx.server.port}",
           source: "hub.config"
         )
 
@@ -551,7 +552,7 @@ defmodule AgentoWeb.HubMessagesTest do
         | policy: %Policy{allow: ["compute.llm.chat"], fidelity_min: :authoritative}
       }
 
-      serve(ctx.bypass, "openai_text_stream.sse")
+      serve(ctx.server, "openai_text_stream.sse")
 
       {conn, _} = Turn.run(test_conn("{}"), turn(), paid, open_client, ctx.config)
       assert get_resp_header(conn, "x-hub-billing") == ["api-key"]
@@ -559,7 +560,7 @@ defmodule AgentoWeb.HubMessagesTest do
 
     test "a client whose policy allows nothing is a 403 and the performer is not contacted",
          ctx do
-      never_contacted(ctx.bypass)
+      never_contacted(ctx.server)
       client = %{ctx.client | policy: %Policy{}}
 
       assert {conn, summary} = Turn.run(test_conn("{}"), turn(), ctx.ad, client, ctx.config)

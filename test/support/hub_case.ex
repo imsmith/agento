@@ -97,7 +97,7 @@ defmodule AgentoWeb.HubCase do
   end
 
   @doc """
-  A performer on a bare socket, for the cases Bypass cannot play: it accepts
+  A performer on a bare socket, for the cases FakeHTTP cannot play: it accepts
   one request, optionally sends `head` as the start of a chunked event
   stream, then never finishes. The task's result is how its connection
   ended (`:closed` when the caller hung up).

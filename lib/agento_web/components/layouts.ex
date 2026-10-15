@@ -32,7 +32,12 @@ defmodule AgentoWeb.Layouts do
       </:brand>
       <:actions>
         <div id="theme-switch" phx-hook="ThemeSwitch" phx-update="ignore">
-          <.theme_switch theme={:tron} mode={:dark} on_change={JS.dispatch("gos:theme")} />
+          <.theme_switch
+            theme={:tron}
+            mode={:dark}
+            on_change={JS.dispatch("gos:theme")}
+            phx-auto-recover="ignore"
+          />
         </div>
       </:actions>
       <:nav><.menu variant={:sidebar} label="Views" items={@nav} selected={@active_nav} /></:nav>
@@ -45,8 +50,7 @@ defmodule AgentoWeb.Layouts do
         id="client-error"
         severity={:critical}
         title="Connection lost."
-        hidden
-        phx-disconnected={JS.show(to: ".phx-client-error #client-error")}
+        phx-disconnected={JS.show(to: ".phx-client-error #client-error", display: "flex")}
         phx-connected={JS.hide(to: "#client-error")}
       >
         The browser cannot reach the server. Reconnecting; nothing to do.
@@ -55,8 +59,7 @@ defmodule AgentoWeb.Layouts do
         id="server-error"
         severity={:critical}
         title="Server error."
-        hidden
-        phx-disconnected={JS.show(to: ".phx-server-error #server-error")}
+        phx-disconnected={JS.show(to: ".phx-server-error #server-error", display: "flex")}
         phx-connected={JS.hide(to: "#server-error")}
       >
         The view crashed and is restarting. If it repeats, check the server log.

@@ -71,4 +71,8 @@ details[open] > summary .ds-chevron { transform: rotate(90deg); }
 .chat-msg--system { color: var(--muted); }
 .chat-role { font-size: var(--text-caption); color: var(--muted); text-transform: uppercase; letter-spacing: var(--tracking-label); margin-bottom: var(--space-half); }
 
+/* No preflight: restore the user-agent hidden rule, which gos-ui's display:flex components would otherwise beat. */
+[hidden]:where(:not([hidden="until-found"])) { display: none !important; }
+/* Connection toasts start hidden; JS.show sets inline display:flex, JS.hide sets display:none. (gos-ui owns the toast style attr, so inline initial state is not available.) */
+#connection-toasts .ds-toast { display: none; }
 [data-phx-session], [data-phx-teleported-src] { display: contents }

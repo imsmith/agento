@@ -24,15 +24,17 @@ defmodule AgentoWeb.DesignSystemTest do
     assert html =~ ~s(aria-current="page")
     assert html =~ ~s(phx-hook="ThemeSwitch")
     assert html =~ ~s(select id="ds-theme")
+    assert html =~ ~r/<form[^>]*id="ds-theme-switch"[^>]*phx-auto-recover="ignore"/
   end
 
   test "an error flash is a persistent critical toast", %{conn: conn} do
     {:ok, view, _html} = live(conn, "/chat?agent=no_such_agent_xyz")
-    html = render(view)
-    assert html =~ ~s(class="ds-toast)
-    assert html =~ ~s(data-severity="critical")
-    assert html =~ ~s(data-duration="0")
-    assert html =~ "no_such_agent_xyz"
+
+    assert has_element?(
+             view,
+             "#flash-toasts-error[data-severity=critical][data-duration='0']",
+             "no_such_agent_xyz"
+           )
   end
 
   test "the theme switch is ignored by LiveView patches so the client owns it", %{conn: conn} do
@@ -46,13 +48,11 @@ defmodule AgentoWeb.DesignSystemTest do
     {:ok, _view, html} = live(conn, "/chat")
 
     for id <- ~w(client-error server-error) do
-      assert html =~ ~s(id="#{id}")
-      assert html =~ ~s(data-severity="critical")
+      assert html =~ ~r/id="#{id}"[^>]*data-severity="critical"/
     end
 
     assert html =~ ~s(.phx-client-error #client-error)
     assert html =~ ~s(.phx-server-error #server-error)
-    assert html =~ ~r/id="client-error"[^>]*\shidden/
   end
 
   @forbidden ~w(

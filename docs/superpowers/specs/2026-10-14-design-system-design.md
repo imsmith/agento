@@ -82,7 +82,7 @@ on source order at equal specificity.
   --font-weight-regular: 400; --font-weight-medium: 500; --font-weight-bold: 700;
 }
 
-@theme inline {
+@theme inline reference {  /* reference: never re-emit these as :root variables; they would cycle with the design-system tokens of the same name */
   --color-bg: var(--bg); --color-surface: var(--surface);
   --color-surface-raised: var(--surface-raised); --color-text: var(--text);
   --color-muted: var(--muted); --color-border: var(--border);

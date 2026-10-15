@@ -388,7 +388,7 @@ Replace `assets/css/app.css` entirely. daisyUI stays for now so unmigrated views
   --font-weight-bold: 700;
 }
 
-@theme inline {
+@theme inline reference {
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-surface-raised: var(--surface-raised);

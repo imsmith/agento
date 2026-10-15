@@ -12,11 +12,12 @@ This is a web application written using the Phoenix web framework.
 - Anytime you run into errors with no `current_scope` assign:
   - You failed to follow the Authenticated Routes guidelines, or you failed to pass `current_scope` to `<Layouts.app>`
   - **Always** fix the `current_scope` error by moving your routes to the proper `live_session` and ensure you pass `current_scope` as needed
-- Phoenix v1.8 moved the `<.flash_group>` component to the `Layouts` module. You are **forbidden** from calling `<.flash_group>` outside of the `layouts.ex` module
-- Out of the box, `core_components.ex` imports an `<.icon name="hero-x-mark" class="w-5 h-5"/>` component for hero icons. **Always** use the `<.icon>` component for icons, **never** use `Heroicons` modules or similar
-- **Always** use the imported `<.input>` component for form inputs from `core_components.ex` when available. `<.input>` is imported and using it will save steps and prevent errors
-- If you override the default input classes (`<.input class="myclass px-2 py-1 rounded-lg">)`) class with your own values, no default classes are inherited, so your
-custom classes must fully style the input
+- UI is the imsmith/design-system via gos-ui; `use GosUi` is in `html_helpers`, so its components (`<.button>`, `<.select>`, `<.toast>`, `<.menu>`, ...) are imported everywhere. gos-ui's `<.input>` takes `name`/`value`/`label`, not `field={@form[:x]}`; `core_components.ex` no longer supplies `<.icon>` or `<.flash_group>`
+- Icons are `<.mark name="m-*" />` from the sprite. **Never** use `<.icon>`, heroicons or `hero-*` classes
+- Local helpers live in `AgentoWeb.DS`: `step/1`, `disclosure`, `pre`, `empty`
+- Flash is rendered by `<.flash_toasts flash={@flash} />` in the layout. **Never** call `<.flash_group>`
+- Lay out with the remapped Tailwind utilities on the halved spacing scale (`p-1` = 8px) and token colors (`text-muted`, `bg-surface`, `border-border`)
+- daisyUI classes, heroicons, `text-xs` and `font-semibold` are forbidden; `test/agento_web/design_system_test.exs` enforces it
 
 ### JS and CSS guidelines
 

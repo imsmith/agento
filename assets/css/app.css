@@ -66,7 +66,9 @@ details .ds-chevron { transition: transform 120ms cubic-bezier(0.2, 0, 0, 1); }
 details[open] > summary .ds-chevron { transform: rotate(90deg); }
 
 /* chat messages: a bordered surface, user messages on the accent tint */
-.chat-msg { max-width: 72ch; padding: var(--space-1) var(--space-2); border: var(--border-width) solid var(--border); border-radius: var(--radius-lg); background: var(--surface); white-space: pre-wrap; }
+.chat-msg { max-width: 72ch; padding: var(--space-1) var(--space-2); border: var(--border-width) solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
+.chat-msg__body { white-space: pre-wrap; }
+.chat-msg .ds-btn__spin { position: static; display: inline-block; }
 .chat-msg--user { margin-left: auto; border-color: var(--accent); background: var(--accent-tint); }
 .chat-msg--system { color: var(--muted); }
 .chat-role { font-size: var(--text-caption); color: var(--muted); text-transform: uppercase; letter-spacing: var(--tracking-label); margin-bottom: var(--space-half); }

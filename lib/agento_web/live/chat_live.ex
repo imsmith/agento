@@ -387,7 +387,7 @@ defmodule AgentoWeb.ChatLive do
     ~H"""
     <div class={["chat-msg", role_class(@message.role)]}>
       <div class="chat-role">{@message.role}</div>
-      <div>{@message.content}</div>
+      <div class="chat-msg__body">{@message.content}</div>
     </div>
     """
   end

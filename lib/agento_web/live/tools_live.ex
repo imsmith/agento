@@ -92,7 +92,12 @@ defmodule AgentoWeb.ToolsLive do
     <.app flash={@flash} active_nav={:tools}>
       <div class="flex h-full gap-2">
         <%!-- Tool list --%>
-        <.card title={"Registered tools (#{length(@tools)})"} density={:compact} flush class="w-36 flex flex-col min-h-0">
+        <.card
+          title={"Registered tools (#{length(@tools)})"}
+          density={:compact}
+          flush
+          class="w-36 flex flex-col min-h-0"
+        >
           <:actions>
             <.button size={:sm} icon="m-refresh" phx-click="refresh_tools" title="Refresh">Refresh</.button>
           </:actions>
@@ -134,9 +139,19 @@ defmodule AgentoWeb.ToolsLive do
             </.card>
 
             <.card title="Manual invocation" density={:compact}>
-              <form id="invoke-tool-form" phx-submit="invoke_tool" phx-change="update_invoke" class="space-y-1">
+              <form
+                id="invoke-tool-form"
+                phx-submit="invoke_tool"
+                phx-change="update_invoke"
+                class="space-y-1"
+              >
                 <.input name="action" value={@invoke_action} placeholder="Action" />
-                <.textarea name="args" value={@invoke_args} rows={4} placeholder={~s|{"key": "value"}|} />
+                <.textarea
+                  name="args"
+                  value={@invoke_args}
+                  rows={4}
+                  placeholder={~s|{"key": "value"}|}
+                />
                 <.button type="submit" variant={:primary} size={:sm} icon="m-run">Invoke</.button>
               </form>
 
@@ -144,7 +159,12 @@ defmodule AgentoWeb.ToolsLive do
                 <.pre value={@invoke_result} />
               </.alert>
 
-              <.alert :if={@invoke_error} severity={:critical} title={error_title(@invoke_error)} class="mt-1">
+              <.alert
+                :if={@invoke_error}
+                severity={:critical}
+                title={error_title(@invoke_error)}
+                class="mt-1"
+              >
                 <pre class="ds-data text-caption whitespace-pre-wrap">{@invoke_error}</pre>
               </.alert>
             </.card>
@@ -160,6 +180,8 @@ defmodule AgentoWeb.ToolsLive do
   end
 
   # what happened · what to do, per the voice chapter
-  defp error_title("Invalid JSON in args field"), do: "Args are not JSON. Fix the text and invoke again."
+  defp error_title("Invalid JSON in args field"),
+    do: "Args are not JSON. Fix the text and invoke again."
+
   defp error_title(_), do: "The tool returned an error."
 end

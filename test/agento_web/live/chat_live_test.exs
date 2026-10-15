@@ -108,7 +108,9 @@ defmodule AgentoWeb.ChatLiveTest do
       |> render_submit()
 
       # The user bubble arrives via PubSub, not synchronously.
-      assert eventually(fn -> has_element?(view, "#chat-messages .chat-msg--user", "hello world") end)
+      assert eventually(fn ->
+               has_element?(view, "#chat-messages .chat-msg--user", "hello world")
+             end)
     end
 
     test "messages loaded from DurableLog on agent selection", %{conn: conn} do
@@ -204,7 +206,9 @@ defmodule AgentoWeb.ChatLiveTest do
 
       assert has_element?(view, "select[name=llm_client]")
       assert has_element?(view, "select[name=memory]")
-      for name <- ~w(role endpoint llm_client memory), do: assert(has_element?(view, "select[name=#{name}]"))
+
+      for name <- ~w(role endpoint llm_client memory),
+          do: assert(has_element?(view, "select[name=#{name}]"))
     end
 
     test "manual endpoint entry reveals model and api_host fields (R2.1)", %{conn: conn} do
@@ -270,9 +274,15 @@ defmodule AgentoWeb.ChatLiveTest do
 
   defp eventually(fun, tries \\ 50) do
     cond do
-      fun.() -> true
-      tries == 0 -> false
-      true -> Process.sleep(20); eventually(fun, tries - 1)
+      fun.() ->
+        true
+
+      tries == 0 ->
+        false
+
+      true ->
+        Process.sleep(20)
+        eventually(fun, tries - 1)
     end
   end
 end

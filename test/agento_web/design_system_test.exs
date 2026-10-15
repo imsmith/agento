@@ -17,7 +17,10 @@ defmodule AgentoWeb.DesignSystemTest do
     {:ok, _view, html} = live(conn, "/chat")
     assert html =~ ~s(class="ds-shell)
     assert html =~ ~s(href="#m-agent")
-    for path <- ~w(/chat /events /system /tools /hub /rules), do: assert(html =~ ~s(href="#{path}"))
+
+    for path <- ~w(/chat /events /system /tools /hub /rules),
+        do: assert(html =~ ~s(href="#{path}"))
+
     assert html =~ ~s(aria-current="page")
     assert html =~ ~s(phx-hook="ThemeSwitch")
     assert html =~ ~s(select id="ds-theme")
@@ -37,12 +40,16 @@ defmodule AgentoWeb.DesignSystemTest do
     assert html =~ ~s(id="theme-switch" phx-hook="ThemeSwitch" phx-update="ignore")
   end
 
-  test "connection toasts are present, hidden, and scoped to the client/server error states", %{conn: conn} do
+  test "connection toasts are present, hidden, and scoped to the client/server error states", %{
+    conn: conn
+  } do
     {:ok, _view, html} = live(conn, "/chat")
+
     for id <- ~w(client-error server-error) do
       assert html =~ ~s(id="#{id}")
       assert html =~ ~s(data-severity="critical")
     end
+
     assert html =~ ~s(.phx-client-error #client-error)
     assert html =~ ~s(.phx-server-error #server-error)
     assert html =~ ~r/id="client-error"[^>]*\shidden/
@@ -66,7 +73,10 @@ defmodule AgentoWeb.DesignSystemTest do
           source = File.read!(path),
           [_whole | groups] <- Regex.scan(@class_attr, source),
           word <- String.split(Enum.join(groups, " "), ~r/[\s"\[\],&|?:(){}=!]+/, trim: true),
-          Enum.any?(@forbidden, &(word == &1 or (String.ends_with?(&1, "-") and String.starts_with?(word, &1)))),
+          Enum.any?(
+            @forbidden,
+            &(word == &1 or (String.ends_with?(&1, "-") and String.starts_with?(word, &1)))
+          ),
           uniq: true,
           do: "#{path}: #{word}"
 

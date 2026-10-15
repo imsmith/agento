@@ -170,7 +170,15 @@ defmodule AgentoWeb.SystemLive do
       <div class="flex flex-col h-full">
         <div class="ds-tabs">
           <div class="ds-tabs__list" role="tablist">
-            <button :for={{id, label} <- tabs()} type="button" role="tab" class="ds-tab" aria-selected={to_string(@active_tab == id)} phx-click="set_tab" phx-value-tab={id}>
+            <button
+              :for={{id, label} <- tabs()}
+              type="button"
+              role="tab"
+              class="ds-tab"
+              aria-selected={to_string(@active_tab == id)}
+              phx-click="set_tab"
+              phx-value-tab={id}
+            >
               <span>{label}</span>
             </button>
           </div>
@@ -191,9 +199,18 @@ defmodule AgentoWeb.SystemLive do
             <% :errors -> %>
               <.errors_panel categories={@error_categories} events={@error_events} />
             <% :modules -> %>
-              <.modules_panel modules={@comn_modules} selected={@selected_module} introspection={@module_introspection} />
+              <.modules_panel
+                modules={@comn_modules}
+                selected={@selected_module}
+                introspection={@module_introspection}
+              />
             <% :durable_log -> %>
-              <.durable_log_panel status={@durable_status} agents={@durable_agents} selected={@durable_selected} info={@durable_info} />
+              <.durable_log_panel
+                status={@durable_status}
+                agents={@durable_agents}
+                selected={@durable_selected}
+                info={@durable_info}
+              />
           <% end %>
         </div>
       </div>
@@ -202,7 +219,14 @@ defmodule AgentoWeb.SystemLive do
   end
 
   defp tabs,
-    do: [sup_tree: "Supervision tree", ets: "ETS tables", contexts: "Contexts", errors: "Error catalog", modules: "Modules", durable_log: "DurableLog"]
+    do: [
+      sup_tree: "Supervision tree",
+      ets: "ETS tables",
+      contexts: "Contexts",
+      errors: "Error catalog",
+      modules: "Modules",
+      durable_log: "DurableLog"
+    ]
 
   # -- Sub-panels --
 
@@ -211,7 +235,11 @@ defmodule AgentoWeb.SystemLive do
     <div>
       <div class="flex items-center gap-1 mb-1.5">
         <h3 class="ds-label">LLMAgent supervision tree</h3>
-        <.button size={:sm} variant={if @auto_refresh, do: :primary, else: :ghost} phx-click="toggle_auto_refresh">Auto-refresh</.button>
+        <.button
+          size={:sm}
+          variant={if @auto_refresh, do: :primary, else: :ghost}
+          phx-click="toggle_auto_refresh"
+        >Auto-refresh</.button>
       </div>
       <.empty :if={@tree == []}>No supervision tree loaded. Click Refresh above.</.empty>
       <div :if={@tree != []} class="space-y-0.5">
@@ -234,7 +262,9 @@ defmodule AgentoWeb.SystemLive do
         <span class="text-caption text-muted">{@node[:module]}</span>
         <.status_badge step={if @node[:alive], do: :low, else: :critical} size={10} />
         <span :if={@node[:pid]} class="text-caption ds-data text-muted">{inspect(@node[:pid])}</span>
-        <span :if={@node[:message_queue_len]} class="text-caption text-muted">mq: {@node[:message_queue_len]}</span>
+        <span :if={@node[:message_queue_len]} class="text-caption text-muted">mq: {@node[
+          :message_queue_len
+        ]}</span>
       </div>
       <%= if @node[:children] do %>
         <.tree_node :for={child <- @node[:children]} node={child} depth={@depth + 1} />
@@ -254,7 +284,10 @@ defmodule AgentoWeb.SystemLive do
             :for={table <- @tables}
             phx-click="select_ets_table"
             phx-value-name={table.name}
-            class={["p-1 rounded-md cursor-pointer hover:bg-surface-raised text-small", @selected == to_string(table.name) && "bg-surface-raised"]}
+            class={[
+              "p-1 rounded-md cursor-pointer hover:bg-surface-raised text-small",
+              @selected == to_string(table.name) && "bg-surface-raised"
+            ]}
             aria-current={@selected == to_string(table.name) && "true"}
           >
             <div class="ds-data font-medium">{table.name}</div>
@@ -277,12 +310,16 @@ defmodule AgentoWeb.SystemLive do
     ~H"""
     <div>
       <h3 class="ds-label mb-0.5">Agent contexts</h3>
-      <p class="text-caption text-muted mb-1.5">Point-in-time snapshot. Context data is ephemeral and only set during prompt handling.</p>
+      <p class="text-caption text-muted mb-1.5">
+        Point-in-time snapshot. Context data is ephemeral and only set during prompt handling.
+      </p>
       <.empty :if={@contexts == []}>No agent contexts found.</.empty>
       <div :if={@contexts != []} class="space-y-1.5">
         <.card :for={ctx <- @contexts} title={to_string(ctx.agent_name)} density={:compact}>
           <.key_value :if={ctx.context} density={:dense}>
-            <:item :for={{key, val} <- Map.from_struct(ctx.context)} key={to_string(key)}>{inspect(val)}</:item>
+            <:item :for={{key, val} <- Map.from_struct(ctx.context)} key={to_string(key)}>
+              {inspect(val)}
+            </:item>
           </.key_value>
           <.empty :if={!ctx.context}>No context set.</.empty>
         </.card>
@@ -297,7 +334,9 @@ defmodule AgentoWeb.SystemLive do
       <h3 class="ds-label mb-1.5">Error catalog</h3>
       <div class="mb-2">
         <h4 class="ds-label mb-0.5">Categories</h4>
-        <div class="flex gap-1 flex-wrap"><.tag :for={cat <- @categories}>{cat}</.tag></div>
+        <div class="flex gap-1 flex-wrap">
+          <.tag :for={cat <- @categories}>{cat}</.tag>
+        </div>
       </div>
       <div>
         <h4 class="ds-label mb-0.5">Error events by category</h4>
@@ -309,7 +348,11 @@ defmodule AgentoWeb.SystemLive do
               <span class="text-caption text-muted">{length(evts)}</span>
             </div>
             <div class="space-y-1">
-              <.alert :for={evt <- evts} severity={:critical} title={to_string(evt.data[:reason] || evt.data["reason"] || "unknown")}>
+              <.alert
+                :for={evt <- evts}
+                severity={:critical}
+                title={to_string(evt.data[:reason] || evt.data["reason"] || "unknown")}
+              >
                 Source: {evt.data[:source] || evt.data["source"] || "unknown"}
               </.alert>
             </div>
@@ -331,7 +374,10 @@ defmodule AgentoWeb.SystemLive do
             :for={mod <- @modules}
             phx-click="select_module"
             phx-value-module={mod}
-            class={["p-1 rounded-md cursor-pointer hover:bg-surface-raised text-small ds-data", @selected == to_string(mod) && "bg-surface-raised"]}
+            class={[
+              "p-1 rounded-md cursor-pointer hover:bg-surface-raised text-small ds-data",
+              @selected == to_string(mod) && "bg-surface-raised"
+            ]}
             aria-current={@selected == to_string(mod) && "true"}
           >
             {mod}
@@ -371,7 +417,10 @@ defmodule AgentoWeb.SystemLive do
               :for={agent <- @agents}
               phx-click="select_durable_agent"
               phx-value-agent={agent}
-              class={["p-1 rounded-md cursor-pointer hover:bg-surface-raised text-small ds-data", @selected == to_string(agent) && "bg-surface-raised"]}
+              class={[
+                "p-1 rounded-md cursor-pointer hover:bg-surface-raised text-small ds-data",
+                @selected == to_string(agent) && "bg-surface-raised"
+              ]}
               aria-current={@selected == to_string(agent) && "true"}
             >
               {agent}
@@ -390,10 +439,18 @@ defmodule AgentoWeb.SystemLive do
               <:item key="Last timestamp">{@info.last_timestamp || "N/A"}</:item>
             </.key_value>
             <:footer>
-              <a href={~p"/export/#{@info.agent}?kind=events"} class="ds-btn ds-btn--primary ds-btn--sm" download>
+              <a
+                href={~p"/export/#{@info.agent}?kind=events"}
+                class="ds-btn ds-btn--primary ds-btn--sm"
+                download
+              >
                 <.mark name="m-download" size={14} /> Events JSON
               </a>
-              <a href={~p"/export/#{@info.agent}?kind=messages"} class="ds-btn ds-btn--primary ds-btn--sm" download>
+              <a
+                href={~p"/export/#{@info.agent}?kind=messages"}
+                class="ds-btn ds-btn--primary ds-btn--sm"
+                download
+              >
                 <.mark name="m-download" size={14} /> Messages JSON
               </a>
             </:footer>

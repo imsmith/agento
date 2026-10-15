@@ -28,7 +28,12 @@ defmodule AgentoWeb.DS do
   @doc "A collapsible block on the native details element, chevron rotating on open."
   def disclosure(assigns) do
     ~H"""
-    <details class={["border border-border rounded-lg my-0.5 bg-surface", @class]} data-step={@step} style={@step && "border-left: 3px solid var(--status-#{@step})"} {@rest}>
+    <details
+      class={["border border-border rounded-lg my-0.5 bg-surface", @class]}
+      data-step={@step}
+      style={@step && "border-left: 3px solid var(--status-#{@step})"}
+      {@rest}
+    >
       <summary class="flex items-center gap-1 p-1 text-small cursor-pointer select-none">
         <.mark name="m-chevron" size={12} class="ds-chevron" />
         <.mark :if={@icon} name={@icon} size={14} />
@@ -45,7 +50,10 @@ defmodule AgentoWeb.DS do
   @doc "An inspected Elixir term as data text."
   def pre(assigns) do
     ~H"""
-    <pre class={["ds-data text-caption whitespace-pre-wrap overflow-x-auto p-1 rounded-md bg-surface-raised", @class]}>{inspect(@value, pretty: true)}</pre>
+    <pre class={[
+      "ds-data text-caption whitespace-pre-wrap overflow-x-auto p-1 rounded-md bg-surface-raised",
+      @class
+    ]}>{inspect(@value, pretty: true)}</pre>
     """
   end
 

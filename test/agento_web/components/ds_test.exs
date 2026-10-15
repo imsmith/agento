@@ -16,7 +16,12 @@ defmodule AgentoWeb.DSTest do
   end
 
   test "disclosure renders a native details element with the chevron" do
-    html = render_component(&DS.disclosure/1, summary: "Tool: x / y", inner_block: [%{inner_block: fn _, _ -> "body" end}])
+    html =
+      render_component(&DS.disclosure/1,
+        summary: "Tool: x / y",
+        inner_block: [%{inner_block: fn _, _ -> "body" end}]
+      )
+
     assert html =~ "<details"
     assert html =~ "<summary"
     assert html =~ ~s(href="#m-chevron")

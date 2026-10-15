@@ -27,7 +27,9 @@ defmodule AgentoWeb.Layouts do
 
     ~H"""
     <.app_shell nav_width="160px" class="flex-1 min-h-0">
-      <:brand><a href="/" class="flex items-center gap-1"><.mark name="m-agent" size={18} /> LLMAgent</a></:brand>
+      <:brand>
+        <a href="/" class="flex items-center gap-1"><.mark name="m-agent" size={18} /> LLMAgent</a>
+      </:brand>
       <:actions>
         <div id="theme-switch" phx-hook="ThemeSwitch" phx-update="ignore">
           <.theme_switch theme={:tron} mode={:dark} on_change={JS.dispatch("gos:theme")} />

@@ -291,11 +291,21 @@ defmodule AgentoWeb.ChatLive do
               <div class="text-caption text-muted">{agent.role} / {agent.model}</div>
               <%= if to_string(agent.name) == @confirm_stop do %>
                 <div class="mt-0.5 flex gap-0.5">
-                  <.button size={:sm} variant={:danger} phx-click="stop_agent" phx-value-name={agent.name}>Stop {agent.name}</.button>
+                  <.button
+                    size={:sm}
+                    variant={:danger}
+                    phx-click="stop_agent"
+                    phx-value-name={agent.name}
+                  >Stop {agent.name}</.button>
                   <.button size={:sm} phx-click="cancel_stop">Cancel</.button>
                 </div>
               <% else %>
-                <.button size={:sm} class="mt-0.5" phx-click="confirm_stop" phx-value-name={agent.name}>Stop</.button>
+                <.button
+                  size={:sm}
+                  class="mt-0.5"
+                  phx-click="confirm_stop"
+                  phx-value-name={agent.name}
+                >Stop</.button>
               <% end %>
             </div>
           </div>
@@ -324,7 +334,11 @@ defmodule AgentoWeb.ChatLive do
               <.agent_config agent={@selected_agent} />
             </div>
 
-            <div class="flex-1 overflow-y-auto p-2 space-y-1.5" id="chat-messages" phx-hook="ScrollBottom">
+            <div
+              class="flex-1 overflow-y-auto p-2 space-y-1.5"
+              id="chat-messages"
+              phx-hook="ScrollBottom"
+            >
               <%= for item <- interleave_messages_and_events(@messages, @events_inline) do %>
                 <%= case item do %>
                   <% {:message, msg} -> %>
@@ -345,7 +359,14 @@ defmodule AgentoWeb.ChatLive do
 
             <form phx-submit="send_prompt" class="p-1 border-t border-border">
               <div class="flex gap-1">
-                <.input name="prompt" value={@prompt_text} phx-change="update_prompt" placeholder="Type a message..." autocomplete="off" class="flex-1" />
+                <.input
+                  name="prompt"
+                  value={@prompt_text}
+                  phx-change="update_prompt"
+                  placeholder="Type a message..."
+                  autocomplete="off"
+                  class="flex-1"
+                />
                 <.button type="submit" variant={:primary} icon="m-send" disabled={@prompt_text == ""}>Send</.button>
               </div>
             </form>
@@ -399,7 +420,11 @@ defmodule AgentoWeb.ChatLive do
 
   defp error_block(assigns) do
     ~H"""
-    <.alert severity={:critical} title={"Error: #{@event.data[:reason] || @event.data["reason"]}"} class="my-0.5">
+    <.alert
+      severity={:critical}
+      title={"Error: #{@event.data[:reason] || @event.data["reason"]}"}
+      class="my-0.5"
+    >
       Source: {@event.data[:source] || @event.data["source"]}
     </.alert>
     """
@@ -424,10 +449,18 @@ defmodule AgentoWeb.ChatLive do
     <form id="new-agent-form" phx-submit="start_agent" phx-change="update_new_agent" class="space-y-1">
       <.input name="name" value={@form.name} placeholder="Agent name (atom)" required />
       <.select name="role" options={available_roles()} value={@form.role} />
-      <.select name="endpoint" options={Enum.map(@endpoint_options, &{&1.label, &1.id})} value={@form.endpoint_id} />
+      <.select
+        name="endpoint"
+        options={Enum.map(@endpoint_options, &{&1.label, &1.id})}
+        value={@form.endpoint_id}
+      />
       <%= if @form.endpoint_id == "manual" do %>
         <.input name="model" value={@form.model} placeholder="Model (e.g. llama3.2)" />
-        <.input name="api_host" value={@form.api_host} placeholder="API host (e.g. http://localhost:11434/v1)" />
+        <.input
+          name="api_host"
+          value={@form.api_host}
+          placeholder="API host (e.g. http://localhost:11434/v1)"
+        />
       <% end %>
       <.select name="llm_client" options={llm_client_options()} value={@form.llm_client} />
       <.select name="memory" options={memory_options()} value={@form.memory} />

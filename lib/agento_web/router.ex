@@ -48,7 +48,7 @@ defmodule AgentoWeb.Router do
   scope "/", AgentoWeb do
     pipe_through :browser
 
-    # Root redirects to chat
+    # Root is the view index
     get "/", PageController, :home
 
     # R7.3 — download agent history as JSON

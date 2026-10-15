@@ -410,25 +410,27 @@ Once the form is submitted, the params will be available under `%{"user" => user
 In the template, the form form assign can be passed to the `<.form>` function component:
 
     <.form for={@form} id="todo-form" phx-change="validate" phx-submit="save">
-      <.input field={@form[:field]} type="text" />
+      <.input name={@form[:field].name} value={@form[:field].value} label="Field" />
     </.form>
+
+In this repo `<.input>` is gos-ui's: it takes `name`/`value`/`label`/`error`, not `field=`. Read the field's `name`, `value` and `errors` off `@form[:field]` and pass them explicitly.
 
 Always give the form an explicit, unique DOM ID, like `id="todo-form"`.
 
 #### Avoiding form errors
 
-**Always** use a form assigned via `to_form/2` in the LiveView, and the `<.input>` component in the template. In the template **always access forms this**:
+**Always** use a form assigned via `to_form/2` in the LiveView, and gos-ui's `<.input>` component (fed from `@form[:field]`) in the template. In the template **always access forms this**:
 
     <%!-- ALWAYS do this (valid) --%>
     <.form for={@form} id="my-form">
-      <.input field={@form[:field]} type="text" />
+      <.input name={@form[:field].name} value={@form[:field].value} />
     </.form>
 
 And **never** do this:
 
     <%!-- NEVER do this (invalid) --%>
     <.form for={@changeset} id="my-form">
-      <.input field={@changeset[:field]} type="text" />
+      <.input name={@changeset[:field].name} value={@changeset[:field].value} />
     </.form>
 
 - You are FORBIDDEN from accessing the changeset in the template as it will cause errors

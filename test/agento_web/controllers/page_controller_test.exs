@@ -1,8 +1,10 @@
 defmodule AgentoWeb.PageControllerTest do
   use AgentoWeb.ConnCase
 
-  test "GET / redirects to chat", %{conn: conn} do
-    assert redirected_to(conn |> get(~p"/")) == "/chat"
+  test "GET / is the view index inside the shell", %{conn: conn} do
+    html = conn |> get(~p"/") |> html_response(200)
+    assert html =~ ~s(class="ds-shell)
+    assert html =~ ~s(class="ds-card__title">Chat</h3>)
   end
 
   test "the home template is the shell with a view index" do

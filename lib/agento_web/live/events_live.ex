@@ -316,7 +316,7 @@ defmodule AgentoWeb.EventsLive do
     ~H"""
     <div class="flex flex-col h-full">
       <form
-        id="live-filters"
+        id="event-filter-form"
         phx-change="update_filter"
         class="flex gap-1 items-end flex-wrap p-1 border-b border-border"
       >
@@ -354,77 +354,76 @@ defmodule AgentoWeb.EventsLive do
       </form>
 
       <div
-        class="flex-1 overflow-y-auto"
+        class="flex-1 overflow-auto"
         id="event-stream"
         phx-hook="AutoScroll"
         data-auto-scroll={to_string(@auto_scroll)}
       >
         <.empty :if={@events == []}>No events yet. Waiting for activity.</.empty>
-        <div :if={@events != []} class="overflow-x-auto">
-          <table class="ds-table ds-table--dense w-full">
-            <thead class="sticky top-0 bg-surface">
-              <tr>
-                <th class="ds-table__th w-22">Timestamp</th>
-                <th class="ds-table__th">Topic</th>
-                <th class="ds-table__th">Type</th>
-                <th class="ds-table__th">Source</th>
-                <th class="ds-table__th w-4"></th>
-                <th class="ds-table__th w-4"></th>
+
+        <table :if={@events != []} class="ds-table ds-table--dense w-full">
+          <thead class="sticky top-0 bg-surface">
+            <tr>
+              <th class="ds-table__th w-22">Timestamp</th>
+              <th class="ds-table__th">Topic</th>
+              <th class="ds-table__th">Type</th>
+              <th class="ds-table__th">Source</th>
+              <th class="ds-table__th w-4"></th>
+              <th class="ds-table__th w-4"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <%= for {{topic, event}, idx} <- Enum.with_index(@events) do %>
+              <tr class="ds-table__row ds-table__row--interactive">
+                <td class="ds-table__td cursor-pointer" phx-click="show_event" phx-value-index={idx}>
+                  {Map.get(event, :timestamp, "")}
+                </td>
+                <td class="ds-table__td cursor-pointer" phx-click="show_event" phx-value-index={idx}>
+                  {topic}
+                </td>
+                <td class="ds-table__td">{Map.get(event, :type, "")}</td>
+                <td class="ds-table__td truncate max-w-16">
+                  {source_text(Map.get(event, :source, ""))}
+                </td>
+                <td class="ds-table__td">
+                  <.button
+                    type="button"
+                    size={:sm}
+                    variant={:text}
+                    phx-click="toggle_row"
+                    phx-value-index={idx}
+                    title="Expand payload"
+                    aria-expanded={to_string(MapSet.member?(@expanded_rows, idx))}
+                  >
+                    <.mark
+                      name="m-chevron"
+                      size={12}
+                      class={MapSet.member?(@expanded_rows, idx) && "rotate-90"}
+                    />
+                  </.button>
+                </td>
+                <td class="ds-table__td">
+                  <.button
+                    type="button"
+                    size={:sm}
+                    variant={:text}
+                    icon="m-external"
+                    phx-click="show_event"
+                    phx-value-index={idx}
+                    title="Open detail"
+                  >
+                    <span class="sr-only">Open</span>
+                  </.button>
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              <%= for {{topic, event}, idx} <- Enum.with_index(@events) do %>
-                <tr class="ds-table__row ds-table__row--interactive">
-                  <td class="ds-table__td cursor-pointer" phx-click="show_event" phx-value-index={idx}>
-                    {Map.get(event, :timestamp, "")}
-                  </td>
-                  <td class="ds-table__td cursor-pointer" phx-click="show_event" phx-value-index={idx}>
-                    {topic}
-                  </td>
-                  <td class="ds-table__td">{Map.get(event, :type, "")}</td>
-                  <td class="ds-table__td truncate max-w-16">
-                    {source_text(Map.get(event, :source, ""))}
-                  </td>
-                  <td class="ds-table__td">
-                    <.button
-                      type="button"
-                      size={:sm}
-                      variant={:text}
-                      phx-click="toggle_row"
-                      phx-value-index={idx}
-                      title="Expand payload"
-                      aria-expanded={to_string(MapSet.member?(@expanded_rows, idx))}
-                    >
-                      <.mark
-                        name="m-chevron"
-                        size={12}
-                        class={MapSet.member?(@expanded_rows, idx) && "rotate-90"}
-                      />
-                    </.button>
-                  </td>
-                  <td class="ds-table__td">
-                    <.button
-                      type="button"
-                      size={:sm}
-                      variant={:text}
-                      icon="m-external"
-                      phx-click="show_event"
-                      phx-value-index={idx}
-                      title="Open detail"
-                    >
-                      <span class="sr-only">Open</span>
-                    </.button>
-                  </td>
-                </tr>
-                <tr :if={MapSet.member?(@expanded_rows, idx)}>
-                  <td colspan="6" class="ds-table__td p-0">
-                    <.pre value={Map.get(event, :data, %{})} class="m-1" />
-                  </td>
-                </tr>
-              <% end %>
-            </tbody>
-          </table>
-        </div>
+              <tr :if={MapSet.member?(@expanded_rows, idx)}>
+                <td colspan="6" class="ds-table__td p-0">
+                  <.pre value={Map.get(event, :data, %{})} class="m-1" />
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
       </div>
     </div>
     """
@@ -436,7 +435,7 @@ defmodule AgentoWeb.EventsLive do
       <div class="p-1 border-b border-border">
         <h3 class="ds-label mb-1">DurableLog query</h3>
         <form
-          id="durable-log-query"
+          id="durable-query-form"
           phx-submit="query_durable_log"
           phx-change="update_durable_query"
           class="flex gap-1 items-end"
@@ -451,36 +450,35 @@ defmodule AgentoWeb.EventsLive do
           <.button type="submit" variant={:primary} size={:sm}>Query</.button>
         </form>
       </div>
-      <div class="flex-1 overflow-y-auto">
+      <div class="flex-1 overflow-auto">
         <.empty :if={@query_results == []}>No results. Run a query above.</.empty>
-        <div :if={@query_results != []} class="overflow-x-auto">
-          <table class="ds-table ds-table--dense w-full">
-            <thead class="sticky top-0 bg-surface">
-              <tr>
-                <th class="ds-table__th w-22">Timestamp</th><th class="ds-table__th">Topic</th><th class="ds-table__th">
-                  Type
-                </th><th class="ds-table__th">Source</th><th class="ds-table__th w-4"></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                :for={{event, idx} <- Enum.with_index(@query_results)}
-                class="ds-table__row ds-table__row--interactive cursor-pointer"
-                phx-click="show_query_event"
-                phx-value-index={idx}
-                tabindex="0"
-              >
-                <td class="ds-table__td">{Map.get(event, :timestamp, "")}</td>
-                <td class="ds-table__td">{Map.get(event, :topic, "")}</td>
-                <td class="ds-table__td">{Map.get(event, :type, "")}</td>
-                <td class="ds-table__td truncate max-w-16">
-                  {source_text(Map.get(event, :source, ""))}
-                </td>
-                <td class="ds-table__td"><.mark name="m-chevron" size={12} /></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+
+        <table :if={@query_results != []} class="ds-table ds-table--dense w-full">
+          <thead class="sticky top-0 bg-surface">
+            <tr>
+              <th class="ds-table__th w-22">Timestamp</th><th class="ds-table__th">Topic</th><th class="ds-table__th">
+                Type
+              </th><th class="ds-table__th">Source</th><th class="ds-table__th w-4"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              :for={{event, idx} <- Enum.with_index(@query_results)}
+              class="ds-table__row ds-table__row--interactive cursor-pointer"
+              phx-click="show_query_event"
+              phx-value-index={idx}
+              tabindex="0"
+            >
+              <td class="ds-table__td">{Map.get(event, :timestamp, "")}</td>
+              <td class="ds-table__td">{Map.get(event, :topic, "")}</td>
+              <td class="ds-table__td">{Map.get(event, :type, "")}</td>
+              <td class="ds-table__td truncate max-w-16">
+                {source_text(Map.get(event, :source, ""))}
+              </td>
+              <td class="ds-table__td"><.mark name="m-chevron" size={12} /></td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
     """
@@ -492,7 +490,7 @@ defmodule AgentoWeb.EventsLive do
       <div class="p-1 border-b border-border">
         <h3 class="ds-label mb-1">EventLog query (in-memory)</h3>
         <form
-          id="event-log-query"
+          id="eventlog-query-form"
           phx-submit="query_event_log"
           phx-change="update_eventlog_query"
           class="flex gap-1 items-end"
@@ -512,35 +510,34 @@ defmodule AgentoWeb.EventsLive do
           <.button type="submit" variant={:primary} size={:sm}>Query</.button>
         </form>
       </div>
-      <div class="flex-1 overflow-y-auto">
+      <div class="flex-1 overflow-auto">
         <.empty :if={@results == []}>No results. Run a query above.</.empty>
-        <div :if={@results != []} class="overflow-x-auto">
-          <table class="ds-table ds-table--dense w-full">
-            <thead class="sticky top-0 bg-surface">
-              <tr>
-                <th class="ds-table__th w-22">Timestamp</th><th class="ds-table__th">Topic</th><th class="ds-table__th">
-                  Type
-                </th><th class="ds-table__th">Source</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                :for={{event, idx} <- Enum.with_index(@results)}
-                class="ds-table__row ds-table__row--interactive cursor-pointer"
-                phx-click="show_eventlog_event"
-                phx-value-index={idx}
-                tabindex="0"
-              >
-                <td class="ds-table__td">{Map.get(event, :timestamp, "")}</td>
-                <td class="ds-table__td">{Map.get(event, :topic, "")}</td>
-                <td class="ds-table__td">{Map.get(event, :type, "")}</td>
-                <td class="ds-table__td truncate max-w-16">
-                  {source_text(Map.get(event, :source, ""))}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+
+        <table :if={@results != []} class="ds-table ds-table--dense w-full">
+          <thead class="sticky top-0 bg-surface">
+            <tr>
+              <th class="ds-table__th w-22">Timestamp</th><th class="ds-table__th">Topic</th><th class="ds-table__th">
+                Type
+              </th><th class="ds-table__th">Source</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              :for={{event, idx} <- Enum.with_index(@results)}
+              class="ds-table__row ds-table__row--interactive cursor-pointer"
+              phx-click="show_eventlog_event"
+              phx-value-index={idx}
+              tabindex="0"
+            >
+              <td class="ds-table__td">{Map.get(event, :timestamp, "")}</td>
+              <td class="ds-table__td">{Map.get(event, :topic, "")}</td>
+              <td class="ds-table__td">{Map.get(event, :type, "")}</td>
+              <td class="ds-table__td truncate max-w-16">
+                {source_text(Map.get(event, :source, ""))}
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
     """

@@ -23,7 +23,7 @@ defmodule AgentoWeb.DesignSystemTest do
 
     assert html =~ ~s(aria-current="page")
     assert html =~ ~s(phx-hook="ThemeSwitch")
-    assert html =~ ~s(select id="ds-theme")
+    assert html =~ ~s(select id="ds-theme-switch-theme")
     assert html =~ ~r/<form[^>]*id="ds-theme-switch"[^>]*phx-auto-recover="ignore"/
   end
 

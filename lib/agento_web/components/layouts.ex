@@ -36,7 +36,6 @@ defmodule AgentoWeb.Layouts do
             theme={:tron}
             mode={:dark}
             on_change={JS.dispatch("gos:theme")}
-            phx-auto-recover="ignore"
           />
         </div>
       </:actions>

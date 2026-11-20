@@ -54,12 +54,12 @@ defmodule Agento.MixProject do
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.3"},
       {:bandit, "~> 1.5"},
-      {:gos_ui, github: "imsmith/gos-ui", ref: "008ed060b5edeee747ecdf539a808a1fd79c0982"},
-      {:LLMAgent, path: "../llmagent"},
+      {:gos_ui, github: "imsmith/gos-ui"},
+      {:LLMAgent, github: "imsmith/llmagent"},
       # Comn comes transitively through LLMAgent
       # Hub: edn configuration and the SQLite turn log
-      {:ex_edn, path: "../ex_edn", override: true},
-      {:anemos, path: "../anemos", override: true},
+      {:ex_edn, github: "imsmith/ex_edn"},
+      {:anemos, github: "imsmith/anemos"},
       {:exqlite, "~> 0.27"},
       # Not in test: a test run must not announce itself in the directory.
       {:busybody, path: "../busybody", only: [:dev, :prod]}
